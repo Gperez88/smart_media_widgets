@@ -1,7 +1,8 @@
 name: smart_media_widgets
 description: "A Flutter package providing smart, reusable widgets for displaying images and videos with preloading, error handling, and optimization features."
 version: 0.1.0-dev.1
-homepage: https://github.com/your-username/smart_media_widgets
+homepage: https://github.com/Gperez88/smart_media_widgets
+author: "Gperez88"
 license: MIT
 
 environment:

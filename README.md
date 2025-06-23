@@ -47,7 +47,7 @@ dependencies:
 dependencies:
   smart_media_widgets:
     git:
-      url: https://github.com/your-username/smart_media_widgets.git
+      url: https://github.com/Gperez88/smart_media_widgets.git
       ref: main
 ```
 
