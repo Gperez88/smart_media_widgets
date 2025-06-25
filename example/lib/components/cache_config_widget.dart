@@ -223,7 +223,7 @@ class _CacheConfigWidgetState extends State<CacheConfigWidget> {
               (value) => _updateConfig(
                 maxImageCacheSize: (value * 100 * 1024 * 1024).round(),
               ),
-              '${CacheManager.formatCacheSize(_currentConfig.maxImageCacheSize)}',
+              CacheManager.formatCacheSize(_currentConfig.maxImageCacheSize),
             ),
 
             const SizedBox(height: 16),
@@ -237,7 +237,7 @@ class _CacheConfigWidgetState extends State<CacheConfigWidget> {
               (value) => _updateConfig(
                 maxVideoCacheSize: (value * 500 * 1024 * 1024).round(),
               ),
-              '${CacheManager.formatCacheSize(_currentConfig.maxVideoCacheSize)}',
+              CacheManager.formatCacheSize(_currentConfig.maxVideoCacheSize),
             ),
 
             const SizedBox(height: 16),
@@ -251,7 +251,7 @@ class _CacheConfigWidgetState extends State<CacheConfigWidget> {
               (value) => _updateConfig(
                 maxAudioCacheSize: (value * 50 * 1024 * 1024).round(),
               ),
-              '${CacheManager.formatCacheSize(_currentConfig.maxAudioCacheSize)}',
+              CacheManager.formatCacheSize(_currentConfig.maxAudioCacheSize),
             ),
 
             const SizedBox(height: 16),

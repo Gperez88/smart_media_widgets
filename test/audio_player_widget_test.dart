@@ -133,11 +133,11 @@ void main() {
     testWidgets('creates with custom placeholder', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: AudioPlayerWidget(
+        widget: const AudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
-          placeholder: const Center(child: CircularProgressIndicator()),
+          placeholder: Center(child: CircularProgressIndicator()),
         ),
         expectedType: AudioPlayerWidget,
       );
@@ -148,11 +148,11 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: AudioPlayerWidget(
+        widget: const AudioPlayerWidget(
           audioSource: 'https://invalid-url-that-will-fail.com/audio.mp3',
           width: 300,
           height: 80,
-          errorWidget: const Center(child: Text('Error loading audio')),
+          errorWidget: Center(child: Text('Error loading audio')),
         ),
         expectedType: AudioPlayerWidget,
       );

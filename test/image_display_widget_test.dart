@@ -63,11 +63,11 @@ void main() {
     testWidgets('creates with custom placeholder', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: ImageDisplayWidget(
+        widget: const ImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
-          width: 200,
-          height: 300,
-          placeholder: const Center(child: CircularProgressIndicator()),
+          width: 300,
+          height: 200,
+          placeholder: Center(child: CircularProgressIndicator()),
         ),
         expectedType: ImageDisplayWidget,
       );
@@ -78,11 +78,11 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: ImageDisplayWidget(
+        widget: const ImageDisplayWidget(
           imageSource: 'https://invalid-url-that-will-fail.com/image.jpg',
-          width: 200,
-          height: 300,
-          errorWidget: const Center(child: Text('Error loading image')),
+          width: 300,
+          height: 200,
+          errorWidget: Center(child: Text('Error loading image')),
         ),
         expectedType: ImageDisplayWidget,
       );

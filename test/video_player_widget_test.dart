@@ -89,11 +89,11 @@ void main() {
     testWidgets('creates with custom placeholder', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: VideoPlayerWidget(
+        widget: const VideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
-          placeholder: const Center(child: CircularProgressIndicator()),
+          placeholder: Center(child: CircularProgressIndicator()),
         ),
         expectedType: VideoPlayerWidget,
       );
@@ -104,11 +104,11 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: VideoPlayerWidget(
+        widget: const VideoPlayerWidget(
           videoSource: 'https://invalid-url-that-will-fail.com/video.mp4',
           width: 400,
           height: 300,
-          errorWidget: const Center(child: Text('Error loading video')),
+          errorWidget: Center(child: Text('Error loading video')),
         ),
         expectedType: VideoPlayerWidget,
       );

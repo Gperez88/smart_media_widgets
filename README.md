@@ -13,7 +13,7 @@ and the Flutter guide for
 
 # Smart Media Widgets
 
-A Flutter package providing smart, reusable widgets for displaying images and videos with preloading, error handling, and optimization features.
+A Flutter package providing smart, reusable widgets for displaying images, videos, and audio with preloading, error handling, and optimization features.
 
 > **⚠️ Development Status**: This package is currently in internal development phase and has not been officially released to pub.dev yet.
 
@@ -21,9 +21,10 @@ A Flutter package providing smart, reusable widgets for displaying images and vi
 
 - **ImageDisplayWidget**: Smart image display with support for local and remote images
 - **VideoDisplayWidget**: Advanced video player with support for local and remote videos
+- **AudioPlayerWidget**: Modern audio player with waveform visualization and bubble-style UI
 - **Preloading**: Built-in preloading for better user experience
 - **Error Handling**: Robust error handling with customizable error widgets
-- **Caching**: Intelligent caching for both images and videos with configurable limits
+- **Caching**: Intelligent caching for images, videos, and audio with configurable limits
 - **Cross-Platform**: Compatible with Android and iOS
 - **Customizable**: Highly customizable with various configuration options
 
@@ -182,6 +183,145 @@ VideoDisplayWidget(
 | `onVideoPause` | `VoidCallback?` | `null` | Callback when video pauses |
 | `onVideoEnd` | `VoidCallback?` | `null` | Callback when video ends |
 
+### AudioPlayerWidget
+
+The `AudioPlayerWidget` provides a modern audio player with waveform visualization, preloading, robust error handling, and advanced cache management. It supports both local and remote audio files, and offers a clean, customizable bubble-style UI with play/pause controls and animated waveform.
+
+```dart
+import 'package:smart_media_widgets/smart_media_widgets.dart';
+
+// Basic remote audio with cache configuration
+AudioPlayerWidget(
+  audioSource: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+  width: double.infinity,
+  height: 100,
+  color: Colors.blueAccent,
+  playIcon: Icons.play_arrow_rounded,
+  pauseIcon: Icons.pause_rounded,
+  borderRadius: BorderRadius.circular(20),
+  onAudioLoaded: () => print('Remote audio loaded!'),
+  onAudioError: (err) => print('Remote audio error: $err'),
+  localCacheConfig: CacheConfig(maxAudioCacheSize: 50 * 1024 * 1024), // 50MB for this instance
+  showLoadingIndicator: true,
+  showSeekLine: true,
+  showDuration: true,
+  showPosition: true,
+  useBubbleStyle: true,
+)
+
+// Custom styled audio player
+AudioPlayerWidget(
+  audioSource: 'https://example.com/audio.mp3',
+  width: double.infinity,
+  height: 120,
+  color: Colors.deepPurple,
+  backgroundColor: Colors.deepPurple.withValues(alpha: 0.9),
+  playIcon: Icons.play_circle_fill,
+  pauseIcon: Icons.pause_circle_filled,
+  borderRadius: BorderRadius.circular(25),
+  showSeekLine: false,
+  showDuration: true,
+  showPosition: true,
+  timeTextStyle: TextStyle(
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: FontWeight.bold,
+  ),
+  useBubbleStyle: true,
+  padding: EdgeInsets.all(20),
+  margin: EdgeInsets.symmetric(vertical: 8),
+)
+
+// Minimal audio player
+AudioPlayerWidget(
+  audioSource: '/path/to/local/audio.mp3',
+  width: double.infinity,
+  height: 80,
+  color: Colors.green,
+  backgroundColor: Colors.green.withValues(alpha: 0.8),
+  borderRadius: BorderRadius.circular(12),
+  showLoadingIndicator: false,
+  showSeekLine: false,
+  showDuration: false,
+  showPosition: false,
+  useBubbleStyle: false,
+  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+)
+
+// Audio with cache disabled
+AudioPlayerWidget(
+  audioSource: 'https://example.com/live-audio.mp3',
+  disableCache: true, // No caching for live content
+  onAudioLoaded: () => print('Live audio loaded without cache'),
+)
+```
+
+#### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `audioSource` | `String` | Required | URL or local file path |
+| `width` | `double?` | `null` | Width of the audio player card |
+| `height` | `double?` | `80` | Height of the audio player card |
+| `borderRadius` | `BorderRadius?` | `null` | Border radius for the card |
+| `placeholder` | `Widget?` | `null` | Custom placeholder widget |
+| `errorWidget` | `Widget?` | `null` | Custom error widget |
+| `showLoadingIndicator` | `bool` | `true` | Show loading indicator |
+| `localCacheConfig` | `CacheConfig?` | `null` | Local cache configuration for this widget |
+| `useGlobalConfig` | `bool` | `true` | Whether to use global cache configuration |
+| `disableCache` | `bool` | `false` | Whether to disable caching for this specific audio |
+| `onAudioLoaded` | `VoidCallback?` | `null` | Callback when audio loads |
+| `onAudioError` | `Function(String)?` | `null` | Callback when audio fails |
+| `color` | `Color` | `Color(0xFF1976D2)` | Main color for the card and waveform |
+| `playIcon` | `IconData` | `Icons.play_arrow` | Icon for play button |
+| `pauseIcon` | `IconData` | `Icons.pause` | Icon for pause button |
+| `animationDuration` | `Duration` | `300ms` | Animation duration for play/pause transitions |
+| `waveStyle` | `PlayerWaveStyle?` | `null` | Custom waveform style (see audio_waveforms) |
+| `showSeekLine` | `bool` | `true` | Whether to show seek line in waveform |
+| `showDuration` | `bool` | `true` | Whether to show total duration text (smart display based on play state) |
+| `showPosition` | `bool` | `true` | Whether to show current position text (smart display based on play state) |
+| `timeTextStyle` | `TextStyle?` | `null` | Text style for duration and position text |
+| `backgroundColor` | `Color?` | `null` | Background color for the player (default: color) |
+| `useBubbleStyle` | `bool` | `true` | Whether to use bubble-style design with shadows |
+| `padding` | `EdgeInsetsGeometry?` | `null` | Padding around the player content |
+| `margin` | `EdgeInsetsGeometry?` | `null` | Margin around the player |
+
+#### Design Features
+
+The `AudioPlayerWidget` features a modern bubble-style design inspired by chat applications:
+
+- **Bubble Design**: Modern rounded corners with subtle shadows
+- **Animated Controls**: Smooth scale animations on button press
+- **Smart Time Display**: 
+  - **When playing**: Shows current position (left) and total duration (right)
+  - **When paused**: Shows total duration (left) and current position (right)
+- **Customizable UI**: Full control over colors, icons, and layout
+- **Responsive Layout**: Adapts to different screen sizes
+- **Touch Feedback**: Visual feedback on button interactions
+- **Waveform Visualization**: Real-time waveform display with seek functionality
+
+#### Audio Cache Configuration
+
+You can configure the maximum audio cache size globally or per widget using `CacheConfig`:
+
+```dart
+// Global audio cache (all audio widgets)
+CacheManager.instance.updateConfig(CacheConfig(
+  maxAudioCacheSize: 100 * 1024 * 1024, // 100MB
+));
+
+// Local audio cache (per widget)
+AudioPlayerWidget(
+  audioSource: 'https://example.com/audio.mp3',
+  localCacheConfig: CacheConfig(maxAudioCacheSize: 20 * 1024 * 1024), // 20MB
+  useGlobalConfig: false, // Only use local config
+)
+```
+
+- The cache will automatically clean up old audio files when the limit is exceeded.
+- Both local and remote audio sources are supported. Remote files are downloaded and cached for fast replay.
+- All configuration options are fully compatible with the existing cache system.
+
 ### Cache Configuration
 
 The package includes a powerful cache management system with configurable limits and automatic cleanup. The new hybrid configuration system allows for flexible cache management at different levels.
@@ -199,6 +339,7 @@ The package includes a powerful cache management system with configurable limits
 |----------|------|---------|-------------|
 | `maxImageCacheSize` | `int` | `100MB` | Maximum size for image cache in bytes |
 | `maxVideoCacheSize` | `int` | `500MB` | Maximum size for video cache in bytes |
+| `maxAudioCacheSize` | `int` | `50MB` | Maximum size for audio cache in bytes |
 | `enableAutoCleanup` | `bool` | `true` | Whether to enable automatic cache cleanup |
 | `cleanupThreshold` | `double` | `0.8` | Cleanup threshold percentage (0.0 to 1.0) |
 | `maxCacheAgeDays` | `int` | `30` | Maximum age of cached files in days |
@@ -212,6 +353,7 @@ The package includes a powerful cache management system with configurable limits
 CacheManager.instance.updateConfig(CacheConfig(
   maxImageCacheSize: 50 * 1024 * 1024, // 50MB
   maxVideoCacheSize: 200 * 1024 * 1024, // 200MB
+  maxAudioCacheSize: 100 * 1024 * 1024, // 100MB
   enableAutoCleanup: true,
   cleanupThreshold: 0.7, // 70%
   maxCacheAgeDays: 7, // 7 days
@@ -250,6 +392,7 @@ CacheConfigScope(
   config: CacheConfig(
     maxImageCacheSize: 20 * 1024 * 1024, // 20MB
     maxVideoCacheSize: 75 * 1024 * 1024, // 75MB
+    maxAudioCacheSize: 50 * 1024 * 1024, // 50MB
     enableAutoCleanup: true,
     cleanupThreshold: 0.6, // 60%
     maxCacheAgeDays: 14, // 14 days
@@ -286,6 +429,7 @@ import 'package:smart_media_widgets/smart_media_widgets.dart';
 CacheManager.instance.updateConfig(CacheConfig(
   maxImageCacheSize: 50 * 1024 * 1024, // 50MB
   maxVideoCacheSize: 200 * 1024 * 1024, // 200MB
+  maxAudioCacheSize: 100 * 1024 * 1024, // 100MB
   enableAutoCleanup: true,
   cleanupThreshold: 0.7, // 70%
   maxCacheAgeDays: 7, // 7 days
@@ -297,10 +441,14 @@ await CacheManager.clearImageCache();
 // Clear video cache
 await CacheManager.clearVideoCache();
 
+// Clear audio cache
+await CacheManager.clearAudioCache();
+
 // Get cache statistics
 final stats = await CacheManager.getCacheStats();
 print('Image cache: ${stats['imageCacheSizeFormatted']}');
 print('Video cache: ${stats['videoCacheSizeFormatted']}');
+print('Audio cache: ${stats['audioCacheSizeFormatted']}');
 
 // Reset to original configuration
 CacheManager.instance.resetToOriginal();
@@ -445,11 +593,15 @@ bool isValidImage = MediaUtils.isValidImageUrl('https://example.com/image.jpg');
 // Validate video URL
 bool isValidVideo = MediaUtils.isValidVideoUrl('https://example.com/video.mp4');
 
+// Validate audio URL
+bool isValidAudio = MediaUtils.isValidAudioUrl('https://example.com/audio.mp3');
+
 // Get file extension
 String? extension = MediaUtils.getFileExtension('https://example.com/file.jpg');
 
 // Check platform support
 bool supportsVideo = MediaUtils.supportsVideoPlayback();
+bool supportsAudio = MediaUtils.supportsAudioPlayback();
 ```
 
 ### Recommended Cache Configurations
@@ -466,6 +618,7 @@ For chat applications with intensive media usage and storage constraints, here a
 CacheManager.instance.updateConfig(CacheConfig(
   maxImageCacheSize: 150 * 1024 * 1024, // 150MB
   maxVideoCacheSize: 750 * 1024 * 1024, // 750MB
+  maxAudioCacheSize: 200 * 1024 * 1024, // 200MB
   enableAutoCleanup: true,
   cleanupThreshold: 0.6, // 60%
   maxCacheAgeDays: 7, // 7 days
@@ -526,6 +679,19 @@ VideoDisplayWidget(
 )
 ```
 
+**Chat Audio Messages (short, medium frequency)**
+```dart
+AudioPlayerWidget(
+  audioSource: chatAudioMessage,
+  localCacheConfig: CacheConfig(
+    maxAudioCacheSize: 100 * 1024 * 1024, // 100MB
+    maxCacheAgeDays: 5, // 5 days
+    cleanupThreshold: 0.6, // 60%
+  ),
+  useGlobalConfig: false,
+)
+```
+
 ##### Context-Based Configurations
 
 **Individual Chat (less content)**
@@ -534,6 +700,7 @@ CacheConfigScope(
   config: CacheConfig(
     maxImageCacheSize: 50 * 1024 * 1024, // 50MB
     maxVideoCacheSize: 200 * 1024 * 1024, // 200MB
+    maxAudioCacheSize: 50 * 1024 * 1024, // 50MB
     maxCacheAgeDays: 5,
     cleanupThreshold: 0.6,
   ),
@@ -547,6 +714,7 @@ CacheConfigScope(
   config: CacheConfig(
     maxImageCacheSize: 300 * 1024 * 1024, // 300MB
     maxVideoCacheSize: 1 * 1024 * 1024 * 1024, // 1GB
+    maxAudioCacheSize: 300 * 1024 * 1024, // 300MB
     maxCacheAgeDays: 7,
     cleanupThreshold: 0.7,
   ),
@@ -561,12 +729,14 @@ CacheConfigScope(
 Timer.periodic(Duration(hours: 24), (timer) async {
   await CacheManager.clearImageCache();
   await CacheManager.clearVideoCache();
+  await CacheManager.clearAudioCache();
 });
 
 // Cleanup on logout
 onLogout() async {
   await CacheManager.clearImageCache();
   await CacheManager.clearVideoCache();
+  await CacheManager.clearAudioCache();
 }
 ```
 
@@ -581,6 +751,7 @@ final maxAllowed = 2 * 1024 * 1024 * 1024; // 2GB
 if (totalSize > maxAllowed * 0.8) {
   await CacheManager.clearImageCache();
   await CacheManager.clearVideoCache();
+  await CacheManager.clearAudioCache();
 }
 ```
 
@@ -592,8 +763,9 @@ if (totalSize > maxAllowed * 0.8) {
 | Stickers/GIFs | 100MB | 14 days | 70% |
 | Chat Photos | 200MB | 5 days | 60% |
 | Chat Videos | 500MB | 3 days | 50% |
-| Individual Chat | 50MB img + 200MB vid | 5 days | 60% |
-| Large Group | 300MB img + 1GB vid | 7 days | 70% |
+| Chat Audio | 100MB | 5 days | 60% |
+| Individual Chat | 50MB img + 200MB vid + 50MB aud | 5 days | 60% |
+| Large Group | 300MB img + 1GB vid + 300MB aud | 7 days | 70% |
 
 ##### Optimization Strategies
 
@@ -608,6 +780,7 @@ if (totalSize > maxAllowed * 0.8) {
 CacheConfig(
   maxImageCacheSize: 200 * 1024 * 1024, // 200MB
   maxVideoCacheSize: 500 * 1024 * 1024, // 500MB
+  maxAudioCacheSize: 150 * 1024 * 1024, // 150MB
   enableAutoCleanup: true,
   cleanupThreshold: 0.6, // 60%
   maxCacheAgeDays: 7, // 7 days
@@ -622,7 +795,7 @@ This configuration balances:
 
 ### Disabling Cache for Specific Content
 
-You can disable caching for specific images or videos using the `disableCache` property:
+You can disable caching for specific images, videos, or audio using the `disableCache` property:
 
 #### Disable Image Cache
 
@@ -658,9 +831,26 @@ VideoDisplayWidget(
 )
 ```
 
+#### Disable Audio Cache
+
+```dart
+// For live audio streams
+AudioPlayerWidget(
+  audioSource: 'https://example.com/live-audio.mp3',
+  disableCache: true, // No caching for live content
+  onAudioLoaded: () => print('Live audio loaded'),
+)
+
+// For sensitive audio
+AudioPlayerWidget(
+  audioSource: 'https://example.com/private-audio.mp3',
+  disableCache: true, // No local storage
+)
+```
+
 #### Use Cases for Disabling Cache
 
-- **Sensitive Content**: Images/videos that shouldn't be stored locally
+- **Sensitive Content**: Images/videos/audio that shouldn't be stored locally
 - **Live Content**: Real-time feeds that change frequently
 - **Temporary Content**: One-time viewing content
 - **Privacy Concerns**: Content that must not persist on device
@@ -682,6 +872,12 @@ When `disableCache: true`:
 - Streaming only, no local file storage
 - Still supports all video player features
 
+**For Audio:**
+- Uses `AudioPlayerController.networkUrl` directly
+- No background download for caching
+- Streaming only, no local file storage
+- Still supports all audio player features
+
 ### Refreshing Cache for Updated Content
 
 When content changes (like a user updating their profile picture), you can refresh the cache to get the latest version:
@@ -701,6 +897,12 @@ await CacheManager.refreshVideo(
   'https://example.com/updated-video.mp4',
   preloadAfterClear: true,
 );
+
+// Refresh a single audio file
+await CacheManager.refreshAudio(
+  'https://example.com/updated-audio.mp3',
+  preloadAfterClear: true,
+);
 ```
 
 #### Refresh Multiple Items
@@ -717,6 +919,12 @@ await CacheManager.refreshImages([
 await CacheManager.refreshVideos([
   'https://example.com/video1.mp4',
   'https://example.com/video2.mp4',
+], preloadAfterClear: true);
+
+// Refresh multiple audio files
+await CacheManager.refreshAudios([
+  'https://example.com/audio1.mp3',
+  'https://example.com/audio2.mp3',
 ], preloadAfterClear: true);
 ```
 
@@ -747,11 +955,11 @@ class ContentService {
 
 1. **Clear Cache**: Removes the old version from both Flutter's image cache and file system
 2. **Optional Preload**: Downloads and caches the new version (if `preloadAfterClear: true`)
-3. **Immediate Effect**: Next time the widget loads the image/video, it gets the fresh content
+3. **Immediate Effect**: Next time the widget loads the image/video/audio, it gets the fresh content
 
 #### Use Cases for Cache Refresh
 
-- **Content Updates**: Images/videos are replaced with new versions
+- **Content Updates**: Images/videos/audio are replaced with new versions
 - **Live Content**: Real-time feeds that need fresh data
 - **Bug Fixes**: When cached content is corrupted or outdated
 - **A/B Testing**: When different content versions need to be tested
@@ -775,6 +983,7 @@ This package uses the following dependencies:
 - `cached_network_image: ^3.4.1` - For remote image caching
 - `video_player: ^2.10.0` - For video playback
 - `chewie: ^1.11.3` - For video player UI
+- `audio_waveforms: ^1.3.0` - For audio waveform visualization
 - `path_provider: ^2.1.5` - For file system access
 - `http: ^1.4.0` - For HTTP requests
 - `flutter_lints: ^5.0.0` - For code quality (dev dependency)
@@ -789,7 +998,7 @@ This package uses the following dependencies:
 
 This package is currently in **internal development phase**. Key milestones:
 
-- ✅ Core widgets implemented
+- ✅ Core widgets implemented (Image, Video, Audio)
 - ✅ Cache management system
 - ✅ Error handling and preloading
 - ✅ Comprehensive documentation
@@ -805,138 +1014,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-### AudioPlayerWidget
-
-The `AudioPlayerWidget` provides a modern audio player with waveform visualization, preloading, robust error handling, and advanced cache management. It supports both local and remote audio files, and offers a clean, customizable bubble-style UI with play/pause controls and animated waveform.
-
-```dart
-import 'package:smart_media_widgets/smart_media_widgets.dart';
-
-// Basic remote audio with cache configuration
-AudioPlayerWidget(
-  audioSource: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-  width: double.infinity,
-  height: 100,
-  color: Colors.blueAccent,
-  playIcon: Icons.play_arrow_rounded,
-  pauseIcon: Icons.pause_rounded,
-  borderRadius: BorderRadius.circular(20),
-  onAudioLoaded: () => print('Remote audio loaded!'),
-  onAudioError: (err) => print('Remote audio error: $err'),
-  localCacheConfig: CacheConfig(maxAudioCacheSize: 50 * 1024 * 1024), // 50MB for this instance
-  showLoadingIndicator: true,
-  showSeekLine: true,
-  showDuration: true,
-  showPosition: true,
-  useBubbleStyle: true,
-)
-
-// Custom styled audio player
-AudioPlayerWidget(
-  audioSource: 'https://example.com/audio.mp3',
-  width: double.infinity,
-  height: 120,
-  color: Colors.deepPurple,
-  backgroundColor: Colors.deepPurple.withValues(alpha: 0.9),
-  playIcon: Icons.play_circle_fill,
-  pauseIcon: Icons.pause_circle_filled,
-  borderRadius: BorderRadius.circular(25),
-  showSeekLine: false,
-  showDuration: true,
-  showPosition: true,
-  timeTextStyle: TextStyle(
-    color: Colors.white,
-    fontSize: 14,
-    fontWeight: FontWeight.bold,
-  ),
-  useBubbleStyle: true,
-  padding: EdgeInsets.all(20),
-  margin: EdgeInsets.symmetric(vertical: 8),
-)
-
-// Minimal audio player
-AudioPlayerWidget(
-  audioSource: '/path/to/local/audio.mp3',
-  width: double.infinity,
-  height: 80,
-  color: Colors.green,
-  backgroundColor: Colors.green.withValues(alpha: 0.8),
-  borderRadius: BorderRadius.circular(12),
-  showLoadingIndicator: false,
-  showSeekLine: false,
-  showDuration: false,
-  showPosition: false,
-  useBubbleStyle: false,
-  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-)
-
-// Custom global cache configuration
-CacheManager.instance.updateConfig(
-  const CacheConfig(maxAudioCacheSize: 10 * 1024 * 1024), // 10MB global
-);
-```
-
-#### Properties
-
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `audioSource` | `String` | Required | URL or local file path |
-| `width` | `double?` | `null` | Width of the audio player card |
-| `height` | `double?` | `80` | Height of the audio player card |
-| `borderRadius` | `BorderRadius?` | `null` | Border radius for the card |
-| `placeholder` | `Widget?` | `null` | Custom placeholder widget |
-| `errorWidget` | `Widget?` | `null` | Custom error widget |
-| `showLoadingIndicator` | `bool` | `true` | Show loading indicator |
-| `localCacheConfig` | `CacheConfig?` | `null` | Local cache configuration for this widget |
-| `useGlobalConfig` | `bool` | `true` | Whether to use global cache configuration |
-| `onAudioLoaded` | `VoidCallback?` | `null` | Callback when audio loads |
-| `onAudioError` | `Function(String)?` | `null` | Callback when audio fails |
-| `color` | `Color` | `Color(0xFF1976D2)` | Main color for the card and waveform |
-| `playIcon` | `IconData` | `Icons.play_arrow` | Icon for play button |
-| `pauseIcon` | `IconData` | `Icons.pause` | Icon for pause button |
-| `animationDuration` | `Duration` | `300ms` | Animation duration for play/pause transitions |
-| `waveStyle` | `PlayerWaveStyle?` | `null` | Custom waveform style (see audio_waveforms) |
-| `showSeekLine` | `bool` | `true` | Whether to show seek line in waveform |
-| `showDuration` | `bool` | `true` | Whether to show total duration text (smart display based on play state) |
-| `showPosition` | `bool` | `true` | Whether to show current position text (smart display based on play state) |
-| `timeTextStyle` | `TextStyle?` | `null` | Text style for duration and position text |
-| `backgroundColor` | `Color?` | `null` | Background color for the player (default: color) |
-| `useBubbleStyle` | `bool` | `true` | Whether to use bubble-style design with shadows |
-| `padding` | `EdgeInsetsGeometry?` | `null` | Padding around the player content |
-| `margin` | `EdgeInsetsGeometry?` | `null` | Margin around the player |
-
-#### Design Features
-
-The `AudioPlayerWidget` now features a modern bubble-style design inspired by chat applications:
-
-- **Bubble Design**: Modern rounded corners with subtle shadows
-- **Animated Controls**: Smooth scale animations on button press
-- **Smart Time Display**: 
-  - **When playing**: Shows current position (left) and total duration (right)
-  - **When paused**: Shows total duration (left) and current position (right)
-- **Customizable UI**: Full control over colors, icons, and layout
-- **Responsive Layout**: Adapts to different screen sizes
-- **Touch Feedback**: Visual feedback on button interactions
-
-#### Audio Cache Configuration
-
-- You can configure the maximum audio cache size globally or per widget using `CacheConfig`:
-
-```dart
-// Global audio cache (all audio widgets)
-CacheManager.instance.updateConfig(CacheConfig(
-  maxAudioCacheSize: 100 * 1024 * 1024, // 100MB
-));
-
-// Local audio cache (per widget)
-AudioPlayerWidget(
-  audioSource: 'https://example.com/audio.mp3',
-  localCacheConfig: CacheConfig(maxAudioCacheSize: 20 * 1024 * 1024), // 20MB
-  useGlobalConfig: false, // Only use local config
-)
-```
-
-- The cache will automatically clean up old audio files when the limit is exceeded.
-- Both local and remote audio sources are supported. Remote files are downloaded and cached for fast replay.
-- All configuration options are fully compatible with the existing cache system.
