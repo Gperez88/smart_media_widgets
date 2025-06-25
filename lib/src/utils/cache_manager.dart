@@ -503,11 +503,28 @@ class CacheManager {
 
   /// Generates a unique file name for an audio file based on its URL
   static String _generateAudioFileName(String audioUrl) {
-    final uri = Uri.parse(audioUrl);
-    final path = uri.path;
-    final extension = path.split('.').last;
-    final hash = audioUrl.hashCode.abs();
-    return 'audio_$hash.$extension';
+    try {
+      final uri = Uri.parse(audioUrl);
+      final path = uri.path;
+
+      // Extract extension from path
+      String extension = 'mp3'; // Default extension
+      if (path.contains('.')) {
+        final pathExtension = path.split('.').last.toLowerCase();
+        // Validate that it's a known audio extension
+        final validExtensions = ['mp3', 'wav', 'aac', 'ogg', 'm4a', 'flac'];
+        if (validExtensions.contains(pathExtension)) {
+          extension = pathExtension;
+        }
+      }
+
+      final hash = audioUrl.hashCode.abs();
+      return 'audio_$hash.$extension';
+    } catch (e) {
+      // Fallback to a safe default
+      final hash = audioUrl.hashCode.abs();
+      return 'audio_$hash.mp3';
+    }
   }
 
   /// Descarga y almacena un video en caché

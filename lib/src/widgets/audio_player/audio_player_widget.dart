@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 import 'dart:io';
 
 import 'package:audio_waveforms/audio_waveforms.dart';
@@ -231,6 +232,8 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
       final path = await _resolveAudioPath();
       _audioPath = path;
 
+      log('AudioPlayerWidget: Preparing player with path: $_audioPath');
+
       // If it's a remote audio and not cached, start background download
       if (MediaUtils.isRemoteSource(widget.audioSource)) {
         final cachedPath = await CacheManager.getCachedAudioPath(
@@ -239,6 +242,22 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
         if (cachedPath == null) {
           // Start background download for future cache
           _downloadAudioInBackground(widget.audioSource);
+        }
+      }
+
+      // Validate the path before preparing the player
+      if (MediaUtils.isRemoteSource(_audioPath!)) {
+        if (!MediaUtils.isValidRemoteUrl(_audioPath!)) {
+          throw Exception('Invalid remote URL: $_audioPath');
+        }
+        if (!MediaUtils.isValidAudioUrl(_audioPath!)) {
+          debugPrint(
+            'AudioPlayerWidget: Warning - URL may not be a valid audio file: $_audioPath',
+          );
+        }
+      } else {
+        if (!File(_audioPath!).existsSync()) {
+          throw Exception('Local audio file not found: $_audioPath');
         }
       }
 
@@ -251,34 +270,49 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
       widget.onAudioLoaded?.call();
       _setLoadingState(false);
     } catch (e) {
+      debugPrint('AudioPlayerWidget: Error preparing audio: $e');
       _handleAudioError(e.toString());
     }
   }
 
   /// Resolve audio path (local or remote)
   Future<String> _resolveAudioPath() async {
+    debugPrint('AudioPlayerWidget: Resolving path for: ${widget.audioSource}');
+
     if (MediaUtils.isRemoteSource(widget.audioSource)) {
+      debugPrint('AudioPlayerWidget: Detected remote source');
+
       // Check if already cached
       final cachedPath = await CacheManager.getCachedAudioPath(
         widget.audioSource,
       );
 
       if (cachedPath != null) {
+        debugPrint('AudioPlayerWidget: Using cached path: $cachedPath');
         // If cached, use local file (faster)
         return cachedPath;
       } else {
+        debugPrint(
+          'AudioPlayerWidget: Using remote URL directly: ${widget.audioSource}',
+        );
         // If not cached, use progressive streaming
         // The audio_waveforms package supports URLs directly
         return widget.audioSource;
       }
     } else if (MediaUtils.isLocalSource(widget.audioSource)) {
+      debugPrint('AudioPlayerWidget: Detected local source');
       final path = MediaUtils.normalizeLocalPath(widget.audioSource);
+      debugPrint('AudioPlayerWidget: Normalized local path: $path');
+
       if (!File(path).existsSync()) {
-        throw Exception('Local audio file not found');
+        throw Exception('Local audio file not found: $path');
       }
       return path;
     } else {
-      throw Exception('Invalid audio source');
+      debugPrint(
+        'AudioPlayerWidget: Invalid source detected: ${widget.audioSource}',
+      );
+      throw Exception('Invalid audio source: ${widget.audioSource}');
     }
   }
 

@@ -25,18 +25,7 @@ class VideoDisplayWidgetExample extends StatelessWidget {
             onVideoLoaded: () => debugPrint('Remote video loaded'),
           ),
           const SizedBox(height: 16),
-          // Note: Local video example commented out as the file doesn't exist
-          // To test with local video, place a video file in your assets and update the path
-          /*
-          VideoDisplayWidget(
-            videoSource: '/path/to/local/video.mp4',
-            width: double.infinity,
-            height: 220,
-            autoPlay: false,
-            onVideoLoaded: () => debugPrint('Local video loaded'),
-          ),
-          const SizedBox(height: 16),
-          */
+
           VideoPlayerWidget(
             videoSource:
                 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',

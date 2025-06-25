@@ -5,7 +5,10 @@ import 'package:flutter/foundation.dart';
 class MediaUtils {
   /// Determines if the given source is a remote URL
   static bool isRemoteSource(String source) {
-    return source.startsWith('http://') || source.startsWith('https://');
+    final isRemote =
+        source.startsWith('http://') || source.startsWith('https://');
+    debugPrint('MediaUtils: isRemoteSource("$source") = $isRemote');
+    return isRemote;
   }
 
   /// Determines if the given source is a local file path
@@ -40,6 +43,32 @@ class MediaUtils {
         lowerUrl.contains('video/');
   }
 
+  /// Validates if the given URL is a valid audio URL
+  static bool isValidAudioUrl(String url) {
+    final audioExtensions = [
+      '.mp3',
+      '.wav',
+      '.aac',
+      '.ogg',
+      '.m4a',
+      '.flac',
+      '.wma',
+    ];
+    final lowerUrl = url.toLowerCase();
+    return audioExtensions.any((ext) => lowerUrl.contains(ext)) ||
+        lowerUrl.contains('audio/');
+  }
+
+  /// Validates if the given URL is a valid remote URL
+  static bool isValidRemoteUrl(String url) {
+    try {
+      final uri = Uri.parse(url);
+      return uri.hasScheme && (uri.scheme == 'http' || uri.scheme == 'https');
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Gets the file extension from a URL or file path
   static String? getFileExtension(String source) {
     final uri = Uri.tryParse(source);
@@ -55,6 +84,11 @@ class MediaUtils {
 
   /// Checks if the platform supports video playback
   static bool supportsVideoPlayback() {
+    return !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+  }
+
+  /// Checks if the platform supports audio playback
+  static bool supportsAudioPlayback() {
     return !kIsWeb && (Platform.isAndroid || Platform.isIOS);
   }
 
