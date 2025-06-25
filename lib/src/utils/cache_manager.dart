@@ -14,6 +14,9 @@ class CacheConfig {
   /// Maximum size for video cache in bytes (default: 500MB)
   final int maxVideoCacheSize;
 
+  /// Maximum size for audio cache in bytes (default: 200MB)
+  final int maxAudioCacheSize;
+
   /// Whether to enable automatic cache cleanup
   final bool enableAutoCleanup;
 
@@ -26,6 +29,7 @@ class CacheConfig {
   const CacheConfig({
     this.maxImageCacheSize = 100 * 1024 * 1024, // 100MB
     this.maxVideoCacheSize = 500 * 1024 * 1024, // 500MB
+    this.maxAudioCacheSize = 200 * 1024 * 1024, // 200MB
     this.enableAutoCleanup = true,
     this.cleanupThreshold = 0.8, // 80%
     this.maxCacheAgeDays = 30,
@@ -35,6 +39,7 @@ class CacheConfig {
   CacheConfig copyWith({
     int? maxImageCacheSize,
     int? maxVideoCacheSize,
+    int? maxAudioCacheSize,
     bool? enableAutoCleanup,
     double? cleanupThreshold,
     int? maxCacheAgeDays,
@@ -42,6 +47,7 @@ class CacheConfig {
     return CacheConfig(
       maxImageCacheSize: maxImageCacheSize ?? this.maxImageCacheSize,
       maxVideoCacheSize: maxVideoCacheSize ?? this.maxVideoCacheSize,
+      maxAudioCacheSize: maxAudioCacheSize ?? this.maxAudioCacheSize,
       enableAutoCleanup: enableAutoCleanup ?? this.enableAutoCleanup,
       cleanupThreshold: cleanupThreshold ?? this.cleanupThreshold,
       maxCacheAgeDays: maxCacheAgeDays ?? this.maxCacheAgeDays,
@@ -53,6 +59,7 @@ class CacheConfig {
     return CacheConfig(
       maxImageCacheSize: other.maxImageCacheSize,
       maxVideoCacheSize: other.maxVideoCacheSize,
+      maxAudioCacheSize: other.maxAudioCacheSize,
       enableAutoCleanup: other.enableAutoCleanup,
       cleanupThreshold: other.cleanupThreshold,
       maxCacheAgeDays: other.maxCacheAgeDays,
@@ -64,6 +71,7 @@ class CacheConfig {
     return CacheConfig(
       maxImageCacheSize: maxImageCacheSize,
       maxVideoCacheSize: maxVideoCacheSize,
+      maxAudioCacheSize: maxAudioCacheSize,
       enableAutoCleanup: enableAutoCleanup,
       cleanupThreshold: cleanupThreshold,
       maxCacheAgeDays: maxCacheAgeDays,
@@ -76,6 +84,7 @@ class CacheConfig {
     return other is CacheConfig &&
         other.maxImageCacheSize == maxImageCacheSize &&
         other.maxVideoCacheSize == maxVideoCacheSize &&
+        other.maxAudioCacheSize == maxAudioCacheSize &&
         other.enableAutoCleanup == enableAutoCleanup &&
         other.cleanupThreshold == cleanupThreshold &&
         other.maxCacheAgeDays == maxCacheAgeDays;
@@ -86,6 +95,7 @@ class CacheConfig {
     return Object.hash(
       maxImageCacheSize,
       maxVideoCacheSize,
+      maxAudioCacheSize,
       enableAutoCleanup,
       cleanupThreshold,
       maxCacheAgeDays,
@@ -97,6 +107,7 @@ class CacheConfig {
     return 'CacheConfig('
         'maxImageCacheSize: ${formatCacheSize(maxImageCacheSize)}, '
         'maxVideoCacheSize: ${formatCacheSize(maxVideoCacheSize)}, '
+        'maxAudioCacheSize: ${formatCacheSize(maxAudioCacheSize)}, '
         'enableAutoCleanup: $enableAutoCleanup, '
         'cleanupThreshold: ${(cleanupThreshold * 100).toInt()}%, '
         'maxCacheAgeDays: $maxCacheAgeDays)';
@@ -180,6 +191,7 @@ class CacheManager {
     return CacheConfig(
       maxImageCacheSize: localConfig.maxImageCacheSize,
       maxVideoCacheSize: localConfig.maxVideoCacheSize,
+      maxAudioCacheSize: localConfig.maxAudioCacheSize,
       enableAutoCleanup: localConfig.enableAutoCleanup,
       cleanupThreshold: localConfig.cleanupThreshold,
       maxCacheAgeDays: localConfig.maxCacheAgeDays,
@@ -196,11 +208,17 @@ class CacheManager {
   /// Clears all cached images
   static Future<void> clearImageCache() async {
     // Clear the default image cache
-    PaintingBinding.instance.imageCache.clear();
-    PaintingBinding.instance.imageCache.clearLiveImages();
+    try {
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
 
-    // Clear cached_network_image cache - this method doesn't take parameters
-    // The cache is cleared globally
+      final imageCacheDir = await getImageCacheDirectory();
+      if (await imageCacheDir.exists()) {
+        await imageCacheDir.delete(recursive: true);
+      }
+    } catch (e) {
+      // Handle cache clearing errors silently
+    }
   }
 
   /// Clears all cached videos
@@ -209,6 +227,18 @@ class CacheManager {
       final videoCacheDir = await getVideoCacheDirectory();
       if (await videoCacheDir.exists()) {
         await videoCacheDir.delete(recursive: true);
+      }
+    } catch (e) {
+      // Handle cache clearing errors silently
+    }
+  }
+
+  /// Clears all cached audio
+  static Future<void> clearAudioCache() async {
+    try {
+      final audioCacheDir = await getAudioCacheDirectory();
+      if (await audioCacheDir.exists()) {
+        await audioCacheDir.delete(recursive: true);
       }
     } catch (e) {
       // Handle cache clearing errors silently
@@ -271,7 +301,7 @@ class CacheManager {
   }) async {
     await clearImageCacheForUrl(imageUrl);
 
-    if (preloadAfterClear && context != null) {
+    if (preloadAfterClear && context != null && context.mounted) {
       await preloadImage(imageUrl, context);
     }
   }
@@ -378,11 +408,38 @@ class CacheManager {
     }
   }
 
-  /// Gets total cache size (images + videos)
+  /// Gets the cache directory for audio files
+  static Future<Directory> getAudioCacheDirectory() async {
+    final cacheDir = await getTemporaryDirectory();
+    final audioCacheDir = Directory('${cacheDir.path}/audio_cache');
+    if (!await audioCacheDir.exists()) {
+      await audioCacheDir.create(recursive: true);
+    }
+    return audioCacheDir;
+  }
+
+  /// Gets the size of the audio cache in bytes
+  static Future<int> getAudioCacheSize() async {
+    try {
+      final audioCacheDir = await getAudioCacheDirectory();
+      int totalSize = 0;
+      await for (final file in audioCacheDir.list(recursive: true)) {
+        if (file is File) {
+          totalSize += await file.length();
+        }
+      }
+      return totalSize;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// Gets total cache size (images + videos + audio)
   static Future<int> getTotalCacheSize() async {
     final imageSize = await getImageCacheSize();
     final videoSize = await getVideoCacheSize();
-    return imageSize + videoSize;
+    final audioSize = await getAudioCacheSize();
+    return imageSize + videoSize + audioSize;
   }
 
   /// Preloads an image into cache
@@ -405,6 +462,52 @@ class CacheManager {
     for (final url in imageUrls) {
       await preloadImage(url, context);
     }
+  }
+
+  /// Downloads and caches an audio file from a remote URL. Returns the local path if successful, or null if failed.
+  static Future<String?> cacheAudio(String audioUrl) async {
+    try {
+      final audioCacheDir = await getAudioCacheDirectory();
+      final fileName = _generateAudioFileName(audioUrl);
+      final audioFile = File('${audioCacheDir.path}/$fileName');
+      // If already cached, return path
+      if (await audioFile.exists()) {
+        return audioFile.path;
+      }
+      // Download audio
+      final response = await http.get(Uri.parse(audioUrl));
+      if (response.statusCode == 200) {
+        await audioFile.writeAsBytes(response.bodyBytes);
+        return audioFile.path;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Gets the path of the cached audio file if it exists, or null if not cached.
+  static Future<String?> getCachedAudioPath(String audioUrl) async {
+    try {
+      final audioCacheDir = await getAudioCacheDirectory();
+      final fileName = _generateAudioFileName(audioUrl);
+      final audioFile = File('${audioCacheDir.path}/$fileName');
+      if (await audioFile.exists()) {
+        return audioFile.path;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Generates a unique file name for an audio file based on its URL
+  static String _generateAudioFileName(String audioUrl) {
+    final uri = Uri.parse(audioUrl);
+    final path = uri.path;
+    final extension = path.split('.').last;
+    final hash = audioUrl.hashCode.abs();
+    return 'audio_$hash.$extension';
   }
 
   /// Descarga y almacena un video en caché
@@ -501,6 +604,7 @@ class CacheManager {
 
     final imageSize = await getImageCacheSize();
     final videoSize = await getVideoCacheSize();
+    final audioSize = await getAudioCacheSize();
 
     bool needsCleanup = false;
 
@@ -513,6 +617,12 @@ class CacheManager {
     // Check video cache
     if (videoSize > _config.maxVideoCacheSize * _config.cleanupThreshold) {
       await _cleanupVideoCache(videoSize);
+      needsCleanup = true;
+    }
+
+    // Check audio cache
+    if (audioSize > _config.maxAudioCacheSize * _config.cleanupThreshold) {
+      await _cleanupAudioCache(audioSize);
       needsCleanup = true;
     }
 
@@ -534,6 +644,10 @@ class CacheManager {
       // Cleanup old video files
       final videoCacheDir = await getVideoCacheDirectory();
       await _cleanupOldFiles(videoCacheDir, maxAge, now);
+
+      // Cleanup old audio files
+      final audioCacheDir = await getAudioCacheDirectory();
+      await _cleanupOldFiles(audioCacheDir, maxAge, now);
     } catch (e) {
       // Handle cleanup errors silently
     }
@@ -641,18 +755,52 @@ class CacheManager {
     }
   }
 
+  /// Cleanup audio cache to reduce size
+  Future<void> _cleanupAudioCache(int currentSize) async {
+    if (currentSize <= _config.maxAudioCacheSize) return;
+    try {
+      final audioCacheDir = await getAudioCacheDirectory();
+      final files = <File>[];
+      await for (final file in audioCacheDir.list(recursive: true)) {
+        if (file is File) {
+          files.add(file);
+        }
+      }
+      files.sort((a, b) {
+        return a.statSync().modified.compareTo(b.statSync().modified);
+      });
+      final int sizeToRemove = currentSize - _config.maxAudioCacheSize;
+      int removedSize = 0;
+      for (final file in files) {
+        if (removedSize >= sizeToRemove) break;
+        try {
+          final fileSize = await file.length();
+          await file.delete();
+          removedSize += fileSize;
+        } catch (e) {
+          // Skip files that can't be deleted
+        }
+      }
+    } catch (e) {
+      // Handle cleanup errors silently
+    }
+  }
+
   /// Get cache statistics
   static Future<Map<String, dynamic>> getCacheStats() async {
     final imageSize = await getImageCacheSize();
     final videoSize = await getVideoCacheSize();
-    final totalSize = imageSize + videoSize;
+    final audioSize = await getAudioCacheSize();
+    final totalSize = imageSize + videoSize + audioSize;
 
     return {
       'imageCacheSize': imageSize,
       'videoCacheSize': videoSize,
+      'audioCacheSize': audioSize,
       'totalCacheSize': totalSize,
       'imageCacheSizeFormatted': formatCacheSize(imageSize),
       'videoCacheSizeFormatted': formatCacheSize(videoSize),
+      'audioCacheSizeFormatted': formatCacheSize(audioSize),
       'totalCacheSizeFormatted': formatCacheSize(totalSize),
     };
   }
@@ -667,11 +815,13 @@ class CacheManager {
     final tempDir = await getTemporaryDirectory();
     final ourImageDir = await getImageCacheDirectory();
     final ourVideoDir = await getVideoCacheDirectory();
+    final ourAudioDir = await getAudioCacheDirectory();
 
     return {
       'temporaryDirectory': tempDir.path,
       'ourImageCacheDirectory': ourImageDir.path,
       'ourVideoCacheDirectory': ourVideoDir.path,
+      'ourAudioCacheDirectory': ourAudioDir.path,
       'cachedNetworkImageDirectory': '${tempDir.path}/libCachedImageData',
     };
   }

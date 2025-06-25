@@ -2,289 +2,380 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smart_media_widgets/smart_media_widgets.dart';
 
+import 'test_utils.dart';
+
 void main() {
-  group('Smart Media Widgets Tests', () {
-    testWidgets('ImageDisplayWidget creates without error', (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: ImageDisplayWidget(
-              imageSource: 'https://picsum.photos/200/300',
-              width: 200,
-              height: 300,
-            ),
-          ),
-        ),
-      );
+  group('Smart Media Widgets - All Tests', () {
+    // Ejecutar pruebas de utilidades
+    TestUtils.testMediaUtils();
+    TestUtils.testCacheManager();
+    TestUtils.runCacheConfigTests();
 
-      expect(find.byType(ImageDisplayWidget), findsOneWidget);
-    });
-
-    testWidgets('VideoDisplayWidget creates without error', (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: VideoDisplayWidget(
-              videoSource:
-                  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-              width: 400,
-              height: 300,
-            ),
-          ),
-        ),
-      );
-
-      expect(find.byType(VideoDisplayWidget), findsOneWidget);
-    });
-
-    testWidgets('ImageDisplayWidget with local cache config', (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: ImageDisplayWidget(
-              imageSource: 'https://picsum.photos/200/300',
-              width: 200,
-              height: 300,
-              localCacheConfig: CacheConfig(
-                maxImageCacheSize: 10 * 1024 * 1024,
-                maxCacheAgeDays: 1,
-              ),
-              useGlobalConfig: false,
-            ),
-          ),
-        ),
-      );
-
-      expect(find.byType(ImageDisplayWidget), findsOneWidget);
-    });
-
-    testWidgets('VideoDisplayWidget with local cache config', (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: VideoDisplayWidget(
-              videoSource:
-                  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-              width: 400,
-              height: 300,
-              localCacheConfig: CacheConfig(
-                maxVideoCacheSize: 50 * 1024 * 1024,
-                maxCacheAgeDays: 2,
-              ),
-              useGlobalConfig: false,
-            ),
-          ),
-        ),
-      );
-
-      expect(find.byType(VideoDisplayWidget), findsOneWidget);
-    });
-
-    testWidgets('CacheConfigScope provides configuration to children', (
-      WidgetTester tester,
-    ) async {
-      const testConfig = CacheConfig(
-        maxImageCacheSize: 15 * 1024 * 1024,
-        maxVideoCacheSize: 75 * 1024 * 1024,
-        enableAutoCleanup: false,
-        cleanupThreshold: 0.6,
-        maxCacheAgeDays: 5,
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: CacheConfigScope(
-              config: testConfig,
-              child: const ImageDisplayWidget(
-                imageSource: 'https://picsum.photos/200/300',
-                width: 200,
-                height: 300,
-              ),
-            ),
-          ),
-        ),
-      );
-
-      expect(find.byType(CacheConfigScope), findsOneWidget);
-      expect(find.byType(ImageDisplayWidget), findsOneWidget);
-    });
-
-    test('MediaUtils.isRemoteSource works correctly', () {
-      expect(MediaUtils.isRemoteSource('https://example.com/image.jpg'), true);
-      expect(MediaUtils.isRemoteSource('http://example.com/image.jpg'), true);
-      expect(MediaUtils.isRemoteSource('/path/to/local/image.jpg'), false);
-    });
-
-    test('MediaUtils.isLocalSource works correctly', () {
-      expect(MediaUtils.isLocalSource('/path/to/local/image.jpg'), true);
-      expect(MediaUtils.isLocalSource('./relative/path/image.jpg'), true);
-      expect(MediaUtils.isLocalSource('https://example.com/image.jpg'), false);
-    });
-
-    test('MediaUtils.isValidImageUrl works correctly', () {
-      expect(MediaUtils.isValidImageUrl('https://example.com/image.jpg'), true);
-      expect(MediaUtils.isValidImageUrl('https://example.com/image.png'), true);
-      expect(
-        MediaUtils.isValidImageUrl('https://example.com/video.mp4'),
-        false,
-      );
-    });
-
-    test('MediaUtils.isValidVideoUrl works correctly', () {
-      expect(MediaUtils.isValidVideoUrl('https://example.com/video.mp4'), true);
-      expect(MediaUtils.isValidVideoUrl('https://example.com/video.avi'), true);
-      expect(
-        MediaUtils.isValidVideoUrl('https://example.com/image.jpg'),
-        false,
-      );
-    });
-
-    test('MediaUtils.getFileExtension works correctly', () {
-      expect(
-        MediaUtils.getFileExtension('https://example.com/image.jpg'),
-        'jpg',
-      );
-      expect(
-        MediaUtils.getFileExtension('https://example.com/video.mp4'),
-        'mp4',
-      );
-      expect(MediaUtils.getFileExtension('https://example.com/file'), null);
-    });
-
-    test('CacheManager.formatCacheSize works correctly', () {
-      expect(CacheManager.formatCacheSize(1024), '1.0 KB');
-      expect(CacheManager.formatCacheSize(1024 * 1024), '1.0 MB');
-      expect(CacheManager.formatCacheSize(1024 * 1024 * 1024), '1.0 GB');
-    });
-
-    group('CacheConfig Tests', () {
-      test('CacheConfig constructor with defaults', () {
-        const config = CacheConfig();
-        expect(config.maxImageCacheSize, 100 * 1024 * 1024);
-        expect(config.maxVideoCacheSize, 500 * 1024 * 1024);
-        expect(config.enableAutoCleanup, true);
-        expect(config.cleanupThreshold, 0.8);
-        expect(config.maxCacheAgeDays, 30);
-      });
-
-      test('CacheConfig copyWith works correctly', () {
-        const original = CacheConfig();
-        final modified = original.copyWith(
-          maxImageCacheSize: 50 * 1024 * 1024,
-          maxCacheAgeDays: 7,
-        );
-
-        expect(modified.maxImageCacheSize, 50 * 1024 * 1024);
-        expect(modified.maxVideoCacheSize, original.maxVideoCacheSize);
-        expect(modified.maxCacheAgeDays, 7);
-        expect(modified.enableAutoCleanup, original.enableAutoCleanup);
-        expect(modified.cleanupThreshold, original.cleanupThreshold);
-      });
-
-      test('CacheConfig merge works correctly', () {
-        const config1 = CacheConfig(
-          maxImageCacheSize: 10 * 1024 * 1024,
-          maxCacheAgeDays: 1,
-        );
-        const config2 = CacheConfig(
-          maxVideoCacheSize: 25 * 1024 * 1024,
+    group('Integration Tests', () {
+      testWidgets('CacheConfigScope provides configuration to children', (
+        WidgetTester tester,
+      ) async {
+        const testConfig = CacheConfig(
+          maxImageCacheSize: 15 * 1024 * 1024,
+          maxVideoCacheSize: 75 * 1024 * 1024,
+          maxAudioCacheSize: 45 * 1024 * 1024,
           enableAutoCleanup: false,
-        );
-
-        final merged = config1.merge(config2);
-        expect(merged.maxImageCacheSize, config2.maxImageCacheSize);
-        expect(merged.maxVideoCacheSize, config2.maxVideoCacheSize);
-        expect(merged.enableAutoCleanup, config2.enableAutoCleanup);
-        expect(merged.cleanupThreshold, config2.cleanupThreshold);
-        expect(merged.maxCacheAgeDays, config2.maxCacheAgeDays);
-      });
-
-      test('CacheConfig equality works correctly', () {
-        const config1 = CacheConfig(
-          maxImageCacheSize: 10 * 1024 * 1024,
-          maxCacheAgeDays: 1,
-        );
-        const config2 = CacheConfig(
-          maxImageCacheSize: 10 * 1024 * 1024,
-          maxCacheAgeDays: 1,
-        );
-        const config3 = CacheConfig(
-          maxImageCacheSize: 20 * 1024 * 1024,
-          maxCacheAgeDays: 1,
-        );
-
-        expect(config1, equals(config2));
-        expect(config1, isNot(equals(config3)));
-      });
-
-      test('CacheConfig toString works correctly', () {
-        const config = CacheConfig(
-          maxImageCacheSize: 10 * 1024 * 1024,
-          maxVideoCacheSize: 50 * 1024 * 1024,
-          enableAutoCleanup: true,
-          cleanupThreshold: 0.7,
+          cleanupThreshold: 0.6,
           maxCacheAgeDays: 5,
         );
 
-        final str = config.toString();
-        expect(str, contains('10.0 MB'));
-        expect(str, contains('50.0 MB'));
-        expect(str, contains('70%'));
-        expect(str, contains('5'));
-      });
-    });
-
-    group('CacheManager Tests', () {
-      test('CacheManager getEffectiveConfig works correctly', () {
-        const globalConfig = CacheConfig(
-          maxImageCacheSize: 100 * 1024 * 1024,
-          maxVideoCacheSize: 500 * 1024 * 1024,
+        await TestUtils.testWidgetWithCache(
+          tester: tester,
+          widget: const ImageDisplayWidget(
+            imageSource: TestUtils.testImageUrl,
+            width: 200,
+            height: 300,
+          ),
+          expectedType: ImageDisplayWidget,
+          cacheConfig: testConfig,
         );
-        const localConfig = CacheConfig(
-          maxImageCacheSize: 50 * 1024 * 1024,
+      });
+
+      testWidgets('Multiple widgets with different cache configs', (
+        WidgetTester tester,
+      ) async {
+        const imageConfig = CacheConfig(
+          maxImageCacheSize: 10 * 1024 * 1024,
+          maxCacheAgeDays: 1,
+        );
+        const videoConfig = CacheConfig(
+          maxVideoCacheSize: 50 * 1024 * 1024,
+          maxCacheAgeDays: 2,
+        );
+        const audioConfig = CacheConfig(
+          maxAudioCacheSize: 30 * 1024 * 1024,
+          maxCacheAgeDays: 3,
+        );
+
+        await tester.pumpWidget(
+          TestUtils.createTestApp(
+            child: const SingleChildScrollView(
+              child: Column(
+                children: [
+                  ImageDisplayWidget(
+                    imageSource: TestUtils.testImageUrl,
+                    width: 200,
+                    height: 300,
+                    localCacheConfig: imageConfig,
+                    useGlobalConfig: false,
+                  ),
+                  SizedBox(height: 16),
+                  VideoPlayerWidget(
+                    videoSource: TestUtils.testVideoUrl,
+                    width: 400,
+                    height: 300,
+                    localCacheConfig: videoConfig,
+                    useGlobalConfig: false,
+                  ),
+                  SizedBox(height: 16),
+                  AudioPlayerWidget(
+                    audioSource: TestUtils.testAudioUrl,
+                    width: 300,
+                    height: 80,
+                    localCacheConfig: audioConfig,
+                    useGlobalConfig: false,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        expect(find.byType(ImageDisplayWidget), findsOneWidget);
+        expect(find.byType(VideoPlayerWidget), findsOneWidget);
+        expect(find.byType(AudioPlayerWidget), findsOneWidget);
+      });
+
+      testWidgets('Widgets with cache disabled', (WidgetTester tester) async {
+        await tester.pumpWidget(
+          TestUtils.createTestApp(
+            child: const SingleChildScrollView(
+              child: Column(
+                children: [
+                  ImageDisplayWidget(
+                    imageSource: TestUtils.testImageUrl,
+                    width: 200,
+                    height: 300,
+                    disableCache: true,
+                  ),
+                  SizedBox(height: 16),
+                  VideoPlayerWidget(
+                    videoSource: TestUtils.testVideoUrl,
+                    width: 400,
+                    height: 300,
+                    disableCache: true,
+                  ),
+                  SizedBox(height: 16),
+                  AudioPlayerWidget(
+                    audioSource: TestUtils.testAudioUrl,
+                    width: 300,
+                    height: 80,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        // Solo un pump para evitar timeout por animaciones/reproductores
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.byType(ImageDisplayWidget), findsOneWidget);
+        expect(find.byType(VideoPlayerWidget), findsOneWidget);
+        expect(find.byType(AudioPlayerWidget), findsOneWidget);
+      });
+
+      testWidgets('Widgets with global cache config', (
+        WidgetTester tester,
+      ) async {
+        const globalConfig = CacheConfig(
+          maxImageCacheSize: 20 * 1024 * 1024,
+          maxVideoCacheSize: 100 * 1024 * 1024,
+          maxAudioCacheSize: 60 * 1024 * 1024,
+          enableAutoCleanup: true,
+          cleanupThreshold: 0.7,
           maxCacheAgeDays: 7,
         );
 
-        CacheManager.instance.updateConfig(globalConfig);
-        final effective = CacheManager.instance.getEffectiveConfig(localConfig);
-
-        expect(effective.maxImageCacheSize, localConfig.maxImageCacheSize);
-        expect(effective.maxVideoCacheSize, localConfig.maxVideoCacheSize);
-        expect(effective.maxCacheAgeDays, localConfig.maxCacheAgeDays);
-        expect(effective.enableAutoCleanup, localConfig.enableAutoCleanup);
-        expect(effective.cleanupThreshold, localConfig.cleanupThreshold);
-      });
-
-      test('CacheManager getEffectiveConfig with null local config', () {
-        const globalConfig = CacheConfig(
-          maxImageCacheSize: 100 * 1024 * 1024,
-          maxVideoCacheSize: 500 * 1024 * 1024,
+        await tester.pumpWidget(
+          TestUtils.createTestAppWithCache(
+            child: const SingleChildScrollView(
+              child: Column(
+                children: [
+                  ImageDisplayWidget(
+                    imageSource: TestUtils.testImageUrl,
+                    width: 200,
+                    height: 300,
+                  ),
+                  SizedBox(height: 16),
+                  VideoPlayerWidget(
+                    videoSource: TestUtils.testVideoUrl,
+                    width: 400,
+                    height: 300,
+                  ),
+                  SizedBox(height: 16),
+                  AudioPlayerWidget(
+                    audioSource: TestUtils.testAudioUrl,
+                    width: 300,
+                    height: 80,
+                  ),
+                ],
+              ),
+            ),
+            cacheConfig: globalConfig,
+          ),
         );
 
-        CacheManager.instance.updateConfig(globalConfig);
-        final effective = CacheManager.instance.getEffectiveConfig(null);
-
-        expect(effective, equals(globalConfig));
+        expect(find.byType(ImageDisplayWidget), findsOneWidget);
+        expect(find.byType(VideoPlayerWidget), findsOneWidget);
+        expect(find.byType(AudioPlayerWidget), findsOneWidget);
+        expect(find.byType(CacheConfigScope), findsOneWidget);
       });
 
+      testWidgets('Widgets with mixed local and global configs', (
+        WidgetTester tester,
+      ) async {
+        const globalConfig = CacheConfig(
+          maxImageCacheSize: 20 * 1024 * 1024,
+          maxVideoCacheSize: 100 * 1024 * 1024,
+          maxAudioCacheSize: 60 * 1024 * 1024,
+        );
+        const localConfig = CacheConfig(
+          maxImageCacheSize: 10 * 1024 * 1024,
+          maxCacheAgeDays: 1,
+        );
+
+        await tester.pumpWidget(
+          TestUtils.createTestAppWithCache(
+            child: const SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Uses local config (overrides global)
+                  ImageDisplayWidget(
+                    imageSource: TestUtils.testImageUrl,
+                    width: 200,
+                    height: 300,
+                    localCacheConfig: localConfig,
+                  ),
+                  SizedBox(height: 16),
+                  // Uses global config
+                  VideoPlayerWidget(
+                    videoSource: TestUtils.testVideoUrl,
+                    width: 400,
+                    height: 300,
+                  ),
+                  SizedBox(height: 16),
+                  // Uses global config
+                  AudioPlayerWidget(
+                    audioSource: TestUtils.testAudioUrl,
+                    width: 300,
+                    height: 80,
+                  ),
+                ],
+              ),
+            ),
+            cacheConfig: globalConfig,
+          ),
+        );
+
+        expect(find.byType(ImageDisplayWidget), findsOneWidget);
+        expect(find.byType(VideoPlayerWidget), findsOneWidget);
+        expect(find.byType(AudioPlayerWidget), findsOneWidget);
+        expect(find.byType(CacheConfigScope), findsOneWidget);
+      });
+
+      testWidgets('Widgets with different media sources', (
+        WidgetTester tester,
+      ) async {
+        await tester.pumpWidget(
+          TestUtils.createTestApp(
+            child: const SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Remote image
+                  ImageDisplayWidget(
+                    imageSource: TestUtils.testImageUrl,
+                    width: 200,
+                    height: 300,
+                  ),
+                  SizedBox(height: 16),
+                  // Local image
+                  ImageDisplayWidget(
+                    imageSource: TestUtils.testLocalImagePath,
+                    width: 200,
+                    height: 300,
+                  ),
+                  SizedBox(height: 16),
+                  // Remote video
+                  VideoPlayerWidget(
+                    videoSource: TestUtils.testVideoUrl,
+                    width: 400,
+                    height: 300,
+                  ),
+                  SizedBox(height: 16),
+                  // Local video
+                  VideoPlayerWidget(
+                    videoSource: TestUtils.testLocalVideoPath,
+                    width: 400,
+                    height: 300,
+                  ),
+                  SizedBox(height: 16),
+                  // Remote audio
+                  AudioPlayerWidget(
+                    audioSource: TestUtils.testAudioUrl,
+                    width: 300,
+                    height: 80,
+                  ),
+                  SizedBox(height: 16),
+                  // Local audio
+                  AudioPlayerWidget(
+                    audioSource: TestUtils.testLocalAudioPath,
+                    width: 300,
+                    height: 80,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        expect(find.byType(ImageDisplayWidget), findsNWidgets(2));
+        expect(find.byType(VideoPlayerWidget), findsNWidgets(2));
+        expect(find.byType(AudioPlayerWidget), findsNWidgets(2));
+      });
+
+      testWidgets('Widgets with error handling', (WidgetTester tester) async {
+        await tester.pumpWidget(
+          TestUtils.createTestApp(
+            child: const SingleChildScrollView(
+              child: Column(
+                children: [
+                  ImageDisplayWidget(
+                    imageSource:
+                        'https://invalid-url-that-will-fail.com/image.jpg',
+                    width: 200,
+                    height: 300,
+                    errorWidget: Center(child: Text('Image Error')),
+                  ),
+                  SizedBox(height: 16),
+                  VideoPlayerWidget(
+                    videoSource:
+                        'https://invalid-url-that-will-fail.com/video.mp4',
+                    width: 400,
+                    height: 300,
+                    errorWidget: Center(child: Text('Video Error')),
+                  ),
+                  SizedBox(height: 16),
+                  AudioPlayerWidget(
+                    audioSource:
+                        'https://invalid-url-that-will-fail.com/audio.mp3',
+                    width: 300,
+                    height: 80,
+                    errorWidget: Center(child: Text('Audio Error')),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        expect(find.byType(ImageDisplayWidget), findsOneWidget);
+        expect(find.byType(VideoPlayerWidget), findsOneWidget);
+        expect(find.byType(AudioPlayerWidget), findsOneWidget);
+      });
+
+      testWidgets('Widgets with custom placeholders', (
+        WidgetTester tester,
+      ) async {
+        await tester.pumpWidget(
+          TestUtils.createTestApp(
+            child: const SingleChildScrollView(
+              child: Column(
+                children: [
+                  ImageDisplayWidget(
+                    imageSource: TestUtils.testImageUrl,
+                    width: 200,
+                    height: 300,
+                    placeholder: Center(child: CircularProgressIndicator()),
+                  ),
+                  SizedBox(height: 16),
+                  VideoPlayerWidget(
+                    videoSource: TestUtils.testVideoUrl,
+                    width: 400,
+                    height: 300,
+                    placeholder: Center(child: CircularProgressIndicator()),
+                  ),
+                  SizedBox(height: 16),
+                  AudioPlayerWidget(
+                    audioSource: TestUtils.testAudioUrl,
+                    width: 300,
+                    height: 80,
+                    placeholder: Center(child: CircularProgressIndicator()),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        expect(find.byType(ImageDisplayWidget), findsOneWidget);
+        expect(find.byType(VideoPlayerWidget), findsOneWidget);
+        expect(find.byType(AudioPlayerWidget), findsOneWidget);
+      });
+    });
+
+    group('CacheManager Integration Tests', () {
       test('CacheManager streaming methods work correctly', () async {
         // Test preloadVideoWithStreaming
-        await CacheManager.preloadVideoWithStreaming(
-          'https://example.com/test.mp4',
-        );
+        await CacheManager.preloadVideoWithStreaming(TestUtils.testVideoUrl);
 
         // Test getVideoStreamingInfo
         final info = await CacheManager.getVideoStreamingInfo(
-          'https://example.com/test.mp4',
+          TestUtils.testVideoUrl,
         );
         expect(info, contains('isCached'));
         expect(info, contains('shouldUseStreaming'));
@@ -293,87 +384,49 @@ void main() {
 
       test('CacheManager video cache methods work correctly', () async {
         // Test cacheVideo (mock test)
-        final result = await CacheManager.cacheVideo(
-          'https://example.com/test.mp4',
-        );
+        final result = await CacheManager.cacheVideo(TestUtils.testVideoUrl);
         // Result can be null if network fails, but method should not throw
         expect(result, anyOf(isA<String>(), isNull));
 
         // Test getCachedVideoPath
         final path = await CacheManager.getCachedVideoPath(
-          'https://example.com/test.mp4',
+          TestUtils.testVideoUrl,
         );
         // Path can be null if not cached, but method should not throw
         expect(path, anyOf(isA<String>(), isNull));
 
         // Test preloadVideosWithStreaming
         await CacheManager.preloadVideosWithStreaming([
-          'https://example.com/test1.mp4',
-          'https://example.com/test2.mp4',
+          TestUtils.testVideoUrl,
+          'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
         ]);
       });
 
       test('CacheManager refresh methods work correctly', () async {
         // Test refreshImage
         await CacheManager.refreshImage(
-          'https://example.com/test.jpg',
+          TestUtils.testImageUrl,
           preloadAfterClear: false,
         );
 
         // Test refreshVideo
         await CacheManager.refreshVideo(
-          'https://example.com/test.mp4',
+          TestUtils.testVideoUrl,
           preloadAfterClear: false,
         );
 
         // Test refreshImages
         await CacheManager.refreshImages([
-          'https://example.com/test1.jpg',
-          'https://example.com/test2.jpg',
+          TestUtils.testImageUrl,
+          'https://picsum.photos/400/500',
         ], preloadAfterClear: false);
 
         // Test refreshVideos
         await CacheManager.refreshVideos([
-          'https://example.com/test1.mp4',
-          'https://example.com/test2.mp4',
+          TestUtils.testVideoUrl,
+          'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
         ], preloadAfterClear: false);
       });
-    });
-
-    testWidgets('ImageDisplayWidget with cache disabled', (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: ImageDisplayWidget(
-              imageSource: 'https://example.com/test.jpg',
-              disableCache: true,
-            ),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-      expect(find.byType(ImageDisplayWidget), findsOneWidget);
-    });
-
-    testWidgets('VideoDisplayWidget with cache disabled', (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: VideoDisplayWidget(
-              videoSource: 'https://example.com/test.mp4',
-              disableCache: true,
-            ),
-          ),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-      expect(find.byType(VideoDisplayWidget), findsOneWidget);
     });
   });
 }

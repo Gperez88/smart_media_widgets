@@ -4,11 +4,15 @@ import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
-import '../utils/cache_manager.dart';
-import '../utils/media_utils.dart';
+import '../../utils/cache_manager.dart';
+import '../../utils/media_utils.dart';
+import 'video_content.dart';
+import 'video_error.dart';
+import 'video_loading.dart';
+import 'video_placeholder.dart';
 
 /// A smart widget for displaying videos with preloading and error handling
-class VideoDisplayWidget extends StatefulWidget {
+class VideoPlayerWidget extends StatefulWidget {
   /// The video source (URL or local file path)
   final String videoSource;
 
@@ -69,7 +73,7 @@ class VideoDisplayWidget extends StatefulWidget {
   /// Callback when video ends
   final VoidCallback? onVideoEnd;
 
-  const VideoDisplayWidget({
+  const VideoPlayerWidget({
     super.key,
     required this.videoSource,
     this.width,
@@ -94,10 +98,10 @@ class VideoDisplayWidget extends StatefulWidget {
   });
 
   @override
-  State<VideoDisplayWidget> createState() => _VideoDisplayWidgetState();
+  State<VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
 }
 
-class _VideoDisplayWidgetState extends State<VideoDisplayWidget> {
+class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
   bool _isLoading = true;
@@ -113,7 +117,7 @@ class _VideoDisplayWidgetState extends State<VideoDisplayWidget> {
   }
 
   @override
-  void didUpdateWidget(VideoDisplayWidget oldWidget) {
+  void didUpdateWidget(VideoPlayerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     // If cache config changed, update it
@@ -254,78 +258,29 @@ class _VideoDisplayWidgetState extends State<VideoDisplayWidget> {
   }
 
   Widget _buildPlaceholder() {
-    if (widget.placeholder != null) {
-      return widget.placeholder!;
-    }
-
-    return Container(
+    return VideoPlaceholder(
       width: widget.width,
       height: widget.height,
-      color: Colors.black,
-      child: widget.showLoadingIndicator
-          ? Center(
-              child: CircularProgressIndicator(
-                color: widget.loadingColor ?? Colors.white,
-              ),
-            )
-          : const SizedBox.shrink(),
+      showLoadingIndicator: widget.showLoadingIndicator,
+      loadingColor: widget.loadingColor,
+      placeholder: widget.placeholder,
     );
   }
 
   Widget _buildErrorWidget(String error) {
-    if (widget.errorWidget != null) {
-      return widget.errorWidget!;
-    }
-
-    return Container(
+    return VideoError(
       width: widget.width,
       height: widget.height,
-      color: Colors.black87,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.videocam_off, size: 48, color: Colors.white54),
-          const SizedBox(height: 8),
-          const Text(
-            'Failed to load video',
-            style: TextStyle(color: Colors.white54, fontSize: 14),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            error,
-            style: const TextStyle(color: Colors.white38, fontSize: 12),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
+      errorMessage: error,
+      errorWidget: widget.errorWidget,
     );
   }
 
   Widget _buildLoadingWidget() {
-    return Container(
+    return VideoLoading(
       width: widget.width,
       height: widget.height,
-      color: Colors.black,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              color: widget.loadingColor ?? Colors.white,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Loading video...',
-              style: TextStyle(
-                color: widget.loadingColor ?? Colors.white,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
+      loadingColor: widget.loadingColor,
     );
   }
 
@@ -343,10 +298,10 @@ class _VideoDisplayWidgetState extends State<VideoDisplayWidget> {
       return _buildPlaceholder();
     }
 
-    return SizedBox(
+    return VideoContent(
       width: widget.width,
       height: widget.height,
-      child: Chewie(controller: _chewieController!),
+      chewieController: _chewieController!,
     );
   }
 }

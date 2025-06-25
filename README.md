@@ -805,3 +805,138 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### AudioPlayerWidget
+
+The `AudioPlayerWidget` provides a modern audio player with waveform visualization, preloading, robust error handling, and advanced cache management. It supports both local and remote audio files, and offers a clean, customizable bubble-style UI with play/pause controls and animated waveform.
+
+```dart
+import 'package:smart_media_widgets/smart_media_widgets.dart';
+
+// Basic remote audio with cache configuration
+AudioPlayerWidget(
+  audioSource: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+  width: double.infinity,
+  height: 100,
+  color: Colors.blueAccent,
+  playIcon: Icons.play_arrow_rounded,
+  pauseIcon: Icons.pause_rounded,
+  borderRadius: BorderRadius.circular(20),
+  onAudioLoaded: () => print('Remote audio loaded!'),
+  onAudioError: (err) => print('Remote audio error: $err'),
+  localCacheConfig: CacheConfig(maxAudioCacheSize: 50 * 1024 * 1024), // 50MB for this instance
+  showLoadingIndicator: true,
+  showSeekLine: true,
+  showDuration: true,
+  showPosition: true,
+  useBubbleStyle: true,
+)
+
+// Custom styled audio player
+AudioPlayerWidget(
+  audioSource: 'https://example.com/audio.mp3',
+  width: double.infinity,
+  height: 120,
+  color: Colors.deepPurple,
+  backgroundColor: Colors.deepPurple.withValues(alpha: 0.9),
+  playIcon: Icons.play_circle_fill,
+  pauseIcon: Icons.pause_circle_filled,
+  borderRadius: BorderRadius.circular(25),
+  showSeekLine: false,
+  showDuration: true,
+  showPosition: true,
+  timeTextStyle: TextStyle(
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: FontWeight.bold,
+  ),
+  useBubbleStyle: true,
+  padding: EdgeInsets.all(20),
+  margin: EdgeInsets.symmetric(vertical: 8),
+)
+
+// Minimal audio player
+AudioPlayerWidget(
+  audioSource: '/path/to/local/audio.mp3',
+  width: double.infinity,
+  height: 80,
+  color: Colors.green,
+  backgroundColor: Colors.green.withValues(alpha: 0.8),
+  borderRadius: BorderRadius.circular(12),
+  showLoadingIndicator: false,
+  showSeekLine: false,
+  showDuration: false,
+  showPosition: false,
+  useBubbleStyle: false,
+  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+)
+
+// Custom global cache configuration
+CacheManager.instance.updateConfig(
+  const CacheConfig(maxAudioCacheSize: 10 * 1024 * 1024), // 10MB global
+);
+```
+
+#### Properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `audioSource` | `String` | Required | URL or local file path |
+| `width` | `double?` | `null` | Width of the audio player card |
+| `height` | `double?` | `80` | Height of the audio player card |
+| `borderRadius` | `BorderRadius?` | `null` | Border radius for the card |
+| `placeholder` | `Widget?` | `null` | Custom placeholder widget |
+| `errorWidget` | `Widget?` | `null` | Custom error widget |
+| `showLoadingIndicator` | `bool` | `true` | Show loading indicator |
+| `localCacheConfig` | `CacheConfig?` | `null` | Local cache configuration for this widget |
+| `useGlobalConfig` | `bool` | `true` | Whether to use global cache configuration |
+| `onAudioLoaded` | `VoidCallback?` | `null` | Callback when audio loads |
+| `onAudioError` | `Function(String)?` | `null` | Callback when audio fails |
+| `color` | `Color` | `Color(0xFF1976D2)` | Main color for the card and waveform |
+| `playIcon` | `IconData` | `Icons.play_arrow` | Icon for play button |
+| `pauseIcon` | `IconData` | `Icons.pause` | Icon for pause button |
+| `animationDuration` | `Duration` | `300ms` | Animation duration for play/pause transitions |
+| `waveStyle` | `PlayerWaveStyle?` | `null` | Custom waveform style (see audio_waveforms) |
+| `showSeekLine` | `bool` | `true` | Whether to show seek line in waveform |
+| `showDuration` | `bool` | `true` | Whether to show total duration text (smart display based on play state) |
+| `showPosition` | `bool` | `true` | Whether to show current position text (smart display based on play state) |
+| `timeTextStyle` | `TextStyle?` | `null` | Text style for duration and position text |
+| `backgroundColor` | `Color?` | `null` | Background color for the player (default: color) |
+| `useBubbleStyle` | `bool` | `true` | Whether to use bubble-style design with shadows |
+| `padding` | `EdgeInsetsGeometry?` | `null` | Padding around the player content |
+| `margin` | `EdgeInsetsGeometry?` | `null` | Margin around the player |
+
+#### Design Features
+
+The `AudioPlayerWidget` now features a modern bubble-style design inspired by chat applications:
+
+- **Bubble Design**: Modern rounded corners with subtle shadows
+- **Animated Controls**: Smooth scale animations on button press
+- **Smart Time Display**: 
+  - **When playing**: Shows current position (left) and total duration (right)
+  - **When paused**: Shows total duration (left) and current position (right)
+- **Customizable UI**: Full control over colors, icons, and layout
+- **Responsive Layout**: Adapts to different screen sizes
+- **Touch Feedback**: Visual feedback on button interactions
+
+#### Audio Cache Configuration
+
+- You can configure the maximum audio cache size globally or per widget using `CacheConfig`:
+
+```dart
+// Global audio cache (all audio widgets)
+CacheManager.instance.updateConfig(CacheConfig(
+  maxAudioCacheSize: 100 * 1024 * 1024, // 100MB
+));
+
+// Local audio cache (per widget)
+AudioPlayerWidget(
+  audioSource: 'https://example.com/audio.mp3',
+  localCacheConfig: CacheConfig(maxAudioCacheSize: 20 * 1024 * 1024), // 20MB
+  useGlobalConfig: false, // Only use local config
+)
+```
+
+- The cache will automatically clean up old audio files when the limit is exceeded.
+- Both local and remote audio sources are supported. Remote files are downloaded and cached for fast replay.
+- All configuration options are fully compatible with the existing cache system.
