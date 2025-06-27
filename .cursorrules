@@ -1,0 +1,177 @@
+# Cursor Rules for Smart Media Widgets
+
+## Project Structure
+
+### Directory Organization
+- `/lib/smart_media_widgets.dart` - Main export file
+- `/lib/src/` - Main source code
+  - `/lib/src/utils/` - Utilities and helpers
+  - `/lib/src/widgets/` - Widgets organized by category
+    - `/lib/src/widgets/audio_player/` - Audio player widgets
+    - `/lib/src/widgets/image_display/` - Image display widgets
+    - `/lib/src/widgets/video_player/` - Video player widgets
+
+### Naming Conventions
+- **Files**: Use snake_case for file names (e.g., `audio_player_widget.dart`)
+- **Classes**: Use PascalCase for class names (e.g., `AudioPlayerWidget`)
+- **Variables and methods**: Use camelCase for private variables and methods (e.g., `_isPlaying`, `_initializeAnimations()`)
+- **Constants**: Use SCREAMING_SNAKE_CASE for global constants
+
+## Documentation and Comments Rules
+
+### 1. Language
+- **All comments and documentation must be in English**
+- Use standard technical terminology in English
+- Maintain language consistency throughout the project
+
+### 2. Class Documentation
+- **Define documentation for all public classes that warrant it**
+- Document each class with detailed description
+- Include main features, use cases, and configurations
+- Provide usage examples in documentation
+- Explain special behavior and limitations
+
+### 3. Property Documentation
+- Document each public property with clear description
+- Specify expected value type and default values
+- Explain special behavior or restrictions
+
+### 4. Method Documentation
+- **Define documentation for public and private methods that warrant it**
+- Document purpose and functionality of each method
+- Describe parameters, return values, and exceptions
+- Explain side effects when relevant
+- Document complex or critical private methods
+
+## Code Patterns
+
+### 1. Widget Structure
+- Completely document each widget with description, features, and use cases
+- Use StatefulWidget for widgets with complex state
+- Separate business logic into private methods organized by functionality
+- Implement initState() and dispose() appropriately
+- Use private state variables with `_` prefix
+
+### 2. Configuration Management
+- Use immutable configuration classes with `copyWith()` and `merge()`
+- Implement `InheritedWidget` for global configuration
+- Allow local configuration to override global
+- Use `CacheConfig` for cache configuration
+
+### 3. Error Handling
+- Always include customizable error widgets
+- Provide error callbacks (`onError`)
+- Show descriptive error messages
+- Handle network and file errors appropriately
+
+### 4. Loading States
+- Include customizable placeholders
+- Show loading indicators when appropriate
+- Handle transition states smoothly
+- Provide clear visual feedback
+
+## Import Rules
+
+### 1. Import Order
+- Dart core imports first
+- Flutter imports second
+- External package imports third
+- Relative project imports last
+
+### 2. Export Files
+- Each widget subdirectory must have an `export.dart`
+- Export only main widgets, not internal ones
+- Keep exports simple and specific
+
+## Testing Rules
+
+### 1. Test Structure
+- **Always generate tests for main functions and widgets/components**
+- One test file per main widget
+- Use `test_utils.dart` for common helpers
+- Include tests for error and loading states
+- Test edge cases and special configurations
+
+### 2. Test Naming
+- Use descriptive names that explain behavior
+- Group related tests with `group()`
+- Test both successful and error cases
+
+### 3. Test Coverage
+- Test all public methods and functions
+- Test widget rendering and interactions
+- Test configuration changes and state updates
+- Test error scenarios and edge cases
+
+## Performance Rules
+
+### 1. Resource Management
+- Always clean up resources in `dispose()`
+- Use `StreamSubscription` for listeners
+- Implement appropriate cache management
+- Avoid memory leaks
+
+### 2. Widget Optimization
+- Use `const` constructors when possible
+- Implement `==` operator and `hashCode` for configurations
+- Avoid unnecessary rebuilds
+- Optimize animations and transitions
+
+## Accessibility Rules
+
+### 1. Semantics
+- Include `semanticsLabel` for interactive widgets
+- Provide descriptions for screen readers
+- Use colors with sufficient contrast
+- Implement keyboard navigation
+
+### 2. UX
+- Provide clear visual feedback
+- Use appropriate state indicators
+- Maintain interface consistency
+
+## Security Rules
+
+### 1. Input Validation
+- Validate URLs and file paths
+- Sanitize user inputs
+- Handle network errors appropriately
+- Validate permissions before accessing resources
+
+### 2. Error Handling
+- Do not expose sensitive information in errors
+- Provide useful error messages
+- Handle cases where permissions are denied
+
+## Maintenance Rules
+
+### 1. Versioning
+- Follow semver for changes
+- Document breaking changes
+- Keep CHANGELOG.md updated
+- Provide migration guides when necessary
+
+### 2. Refactoring
+- Maintain backward compatibility when possible
+- Deprecate methods instead of removing them abruptly
+- Document important changes
+
+## Project-Specific Rules
+
+### 1. Media Widgets
+- All widgets must support local and remote sources
+- Implement consistent cache management
+- Provide placeholders and error states
+- Handle different media formats
+
+### 2. Cache Configuration
+- Use `CacheConfig` for global configuration
+- Allow local configuration per widget
+- Implement automatic cleanup
+- Manage size limits appropriately
+
+### 3. UI/UX
+- Follow Material Design guidelines
+- Provide smooth animations
+- Maintain visual consistency between widgets
+- Use coherent colors and styles 

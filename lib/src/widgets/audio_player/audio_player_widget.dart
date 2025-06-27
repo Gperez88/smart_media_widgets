@@ -256,8 +256,33 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
           );
         }
       } else {
+        // For local files (including cached files), verify they exist
         if (!File(_audioPath!).existsSync()) {
-          throw Exception('Local audio file not found: $_audioPath');
+          debugPrint(
+            'AudioPlayerWidget: File not found, attempting to re-resolve path: $_audioPath',
+          );
+
+          // Try to re-resolve the path in case cache was cleared
+          final newPath = await _resolveAudioPath();
+          if (newPath != _audioPath) {
+            _audioPath = newPath;
+            debugPrint('AudioPlayerWidget: Re-resolved path: $_audioPath');
+          } else {
+            throw Exception('Local audio file not found: $_audioPath');
+          }
+        }
+      }
+
+      // Additional validation: if this is a cached file path, double-check it exists
+      if (_audioPath != null &&
+          !MediaUtils.isRemoteSource(_audioPath!) &&
+          MediaUtils.isRemoteSource(widget.audioSource)) {
+        // This is a cached file path, verify it still exists
+        if (!File(_audioPath!).existsSync()) {
+          debugPrint(
+            'AudioPlayerWidget: Cached file no longer exists, falling back to remote URL',
+          );
+          _audioPath = widget.audioSource;
         }
       }
 
@@ -271,7 +296,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
       _setLoadingState(false);
     } catch (e) {
       debugPrint('AudioPlayerWidget: Error preparing audio: $e');
-      _handleAudioError(e.toString());
+      await _handlePlayerError(e);
     }
   }
 
@@ -288,9 +313,19 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
       );
 
       if (cachedPath != null) {
-        debugPrint('AudioPlayerWidget: Using cached path: $cachedPath');
-        // If cached, use local file (faster)
-        return cachedPath;
+        debugPrint('AudioPlayerWidget: Found cached path: $cachedPath');
+
+        // Validate that the cached file still exists
+        if (File(cachedPath).existsSync()) {
+          debugPrint('AudioPlayerWidget: Using cached path: $cachedPath');
+          return cachedPath;
+        } else {
+          debugPrint(
+            'AudioPlayerWidget: Cached file no longer exists, falling back to remote URL',
+          );
+          // If cached file was deleted, fall back to remote URL
+          return widget.audioSource;
+        }
       } else {
         debugPrint(
           'AudioPlayerWidget: Using remote URL directly: ${widget.audioSource}',
@@ -364,8 +399,8 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
         });
       }
     } catch (e) {
-      // Handle playback errors silently
-      debugPrint('Error toggling play/pause: $e');
+      // Handle playback errors with recovery
+      await _handlePlayerError(e);
     }
   }
 
@@ -375,6 +410,53 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
     _durationSubscription?.cancel();
     _playerController.dispose();
     _animationController.dispose();
+  }
+
+  /// Clear cached file reference if it no longer exists
+  Future<void> _clearInvalidCacheReference() async {
+    if (_audioPath != null &&
+        MediaUtils.isRemoteSource(widget.audioSource) &&
+        !MediaUtils.isRemoteSource(_audioPath!)) {
+      // This is a cached file path, check if it still exists
+      if (!File(_audioPath!).existsSync()) {
+        debugPrint(
+          'AudioPlayerWidget: Clearing invalid cache reference: $_audioPath',
+        );
+        _audioPath = null;
+      }
+    }
+  }
+
+  /// Handle player errors and attempt recovery
+  Future<void> _handlePlayerError(dynamic error) async {
+    debugPrint('AudioPlayerWidget: Player error: $error');
+
+    // Check if it's a file not found error or platform exception with source error
+    final errorString = error.toString();
+    if (errorString.contains('FileNotFoundException') ||
+        errorString.contains('ENOENT') ||
+        errorString.contains('No such file or directory') ||
+        (errorString.contains('PlatformException') &&
+            errorString.contains('Source error') &&
+            errorString.contains('Unable to load media source'))) {
+      debugPrint(
+        'AudioPlayerWidget: Detected file not found or source error, attempting recovery',
+      );
+
+      // Clear invalid cache reference
+      await _clearInvalidCacheReference();
+
+      // Try to re-prepare the audio
+      try {
+        await _prepareAudio();
+        return; // Success, exit early
+      } catch (e) {
+        debugPrint('AudioPlayerWidget: Recovery failed: $e');
+      }
+    }
+
+    // If recovery failed or it's a different error, handle normally
+    _handleAudioError(error.toString());
   }
 
   @override

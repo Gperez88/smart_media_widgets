@@ -142,6 +142,39 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               ],
             ),
           ),
+
+          const SizedBox(height: 24),
+
+          // Example with cache configuration
+          AudioPlayerWidget(
+            audioSource:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+            width: 300,
+            height: 100,
+            color: Colors.teal,
+            localCacheConfig: const CacheConfig(
+              maxAudioCacheSize: 50 * 1024 * 1024, // 50MB
+              enableAutoCleanup: true,
+              cleanupThreshold: 0.7,
+            ),
+            onAudioLoaded: () => debugPrint('Cached audio loaded successfully'),
+            onAudioError: (err) => debugPrint('Cached audio error: $err'),
+          ),
+          const SizedBox(height: 20),
+
+          // Example with error recovery demonstration
+          AudioPlayerWidget(
+            audioSource:
+                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
+            width: 300,
+            height: 100,
+            color: Colors.orange,
+            onAudioLoaded: () => debugPrint('Audio with error recovery loaded'),
+            onAudioError: (err) {
+              debugPrint('Audio error (will attempt recovery): $err');
+              // The widget will automatically attempt to recover from cache-related errors
+            },
+          ),
         ],
       ),
     );
