@@ -94,6 +94,12 @@ class AudioPlayerWidget extends StatefulWidget {
   /// Margin around the player
   final EdgeInsetsGeometry? margin;
 
+  /// Whether to disable caching for this specific audio
+  final bool disableCache;
+
+  /// Whether to enable global player mode (WhatsApp/Telegram style)
+  final bool enableGlobalPlayer;
+
   const AudioPlayerWidget({
     super.key,
     required this.audioSource,
@@ -120,6 +126,8 @@ class AudioPlayerWidget extends StatefulWidget {
     this.useBubbleStyle = true,
     this.padding,
     this.margin,
+    this.disableCache = false,
+    this.enableGlobalPlayer = false,
   });
 
   @override
@@ -145,14 +153,24 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
   // Cache configuration management
   Function()? _restoreConfig;
   StreamSubscription? _durationSubscription;
+  
+  // Global player state
+  bool _isPlayingGlobally = false;
+  StreamSubscription? _globalPlayerSubscription;
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _applyCacheConfig();
+    
+    // Always prepare audio locally to show waveform (for visual consistency)
     _prepareAudio();
     _setupPlayerListeners();
+    
+    if (widget.enableGlobalPlayer) {
+      _setupGlobalPlayerListener();
+    }
   }
 
   @override
@@ -165,6 +183,29 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
   void dispose() {
     _cleanup();
     super.dispose();
+  }
+
+  /// Setup global player listener
+  void _setupGlobalPlayerListener() {
+    _globalPlayerSubscription = GlobalAudioPlayerManager.instance.stateStream.listen((state) {
+      if (mounted) {
+        final isNowPlayingGlobally = state?.audioSource == widget.audioSource && 
+                                     GlobalAudioPlayerManager.instance.hasActivePlayer;
+        
+        setState(() {
+          _isPlayingGlobally = isNowPlayingGlobally;
+          
+          // Sync local UI state with global player state
+          if (isNowPlayingGlobally) {
+            _isPlaying = state?.isPlaying ?? false;
+            _position = state?.position ?? Duration.zero;
+            _duration = state?.duration ?? Duration.zero;
+          } else {
+            _isPlaying = false;
+          }
+        });
+      }
+    });
   }
 
   /// Initialize widget animations
@@ -386,6 +427,19 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
 
   /// Toggle between play and pause
   Future<void> _togglePlayPause() async {
+    if (widget.enableGlobalPlayer) {
+      // Handle global player control
+      if (_isPlayingGlobally) {
+        // If already playing globally, toggle global player
+        await GlobalAudioPlayerManager.instance.togglePlayPause();
+      } else {
+        // Start global playback
+        await _startGlobalPlayback();
+      }
+      return;
+    }
+
+    // Local playback logic (original behavior)
     try {
       if (_isPlaying) {
         await _playerController.pausePlayer();
@@ -404,11 +458,32 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
     }
   }
 
+  /// Start global playback
+  Future<void> _startGlobalPlayback() async {
+    try {
+      await GlobalAudioPlayerManager.instance.startGlobalPlayback(
+        audioSource: widget.audioSource,
+        color: widget.color,
+        playIcon: widget.playIcon,
+        pauseIcon: widget.pauseIcon,
+        waveStyle: widget.waveStyle,
+        showSeekLine: widget.showSeekLine,
+        cacheConfig: widget.localCacheConfig,
+      );
+    } catch (e) {
+      widget.onAudioError?.call(e.toString());
+    }
+  }
+
   /// Clean up resources
   void _cleanup() {
     _restoreConfig?.call();
     _durationSubscription?.cancel();
+    _globalPlayerSubscription?.cancel();
+    
+    // Always dispose local player (it's only used for waveform display in global mode)
     _playerController.dispose();
+    
     _animationController.dispose();
   }
 
@@ -461,6 +536,13 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
 
   @override
   Widget build(BuildContext context) {
+    // If global player is enabled, the local player works normally
+    // but starts global playback instead of local playback
+    if (widget.enableGlobalPlayer) {
+      // Always show normal player UI, but onTogglePlayPause will handle global logic
+      // No special UI changes - player looks and acts the same
+    }
+
     if (_isLoading) {
       return AudioPlayerPlaceholder(
         width: widget.width,
@@ -512,4 +594,5 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
       onTogglePlayPause: _togglePlayPause,
     );
   }
+
 }

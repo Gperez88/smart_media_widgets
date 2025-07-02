@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class AudioPlayPauseButton extends StatelessWidget {
   final bool isPlaying;
+  final bool isLoading;
   final IconData playIcon;
   final IconData pauseIcon;
   final Color color;
@@ -12,6 +13,7 @@ class AudioPlayPauseButton extends StatelessWidget {
   const AudioPlayPauseButton({
     super.key,
     required this.isPlaying,
+    this.isLoading = false,
     required this.playIcon,
     required this.pauseIcon,
     required this.color,
@@ -45,12 +47,22 @@ class AudioPlayPauseButton extends StatelessWidget {
           duration: animationDuration,
           transitionBuilder: (child, anim) =>
               ScaleTransition(scale: anim, child: child),
-          child: Icon(
-            isPlaying ? pauseIcon : playIcon,
-            key: ValueKey(isPlaying),
-            color: color,
-            size: 24,
-          ),
+          child: isLoading
+              ? SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    key: const ValueKey('loading'),
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+                )
+              : Icon(
+                  isPlaying ? pauseIcon : playIcon,
+                  key: ValueKey(isPlaying),
+                  color: color,
+                  size: 24,
+                ),
         ),
       ),
     );
