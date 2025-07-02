@@ -163,21 +163,13 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
   Function()? _restoreConfig;
   StreamSubscription? _durationSubscription;
 
-  // Global player state
-  bool _isPlayingGlobally = false;
+  // Global player subscription for cleanup
   StreamSubscription? _globalPlayerSubscription;
-  int? _lastSyncTime;
 
   /// Get or create PlayerController based on mode
   PlayerController get _effectivePlayerController {
-    if (widget.enableGlobalPlayer) {
-      // In global mode, use the global player controller
-      return GlobalAudioPlayerManager.instance.currentState?.playerController ??
-          (_playerController ??= PlayerController());
-    } else {
-      // In local mode, use local controller
-      return _playerController ??= PlayerController();
-    }
+    // Both global and local players use their own controller
+    return _playerController ??= PlayerController();
   }
 
   @override
@@ -186,18 +178,20 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
     _initializeAnimations();
     _applyCacheConfig();
 
+    // Register global player if enabled
     if (widget.enableGlobalPlayer) {
-      // In global mode, don't prepare audio locally to save memory
-      // The global player will handle audio preparation
-      _setupGlobalPlayerListener();
-      _setLoadingState(
-        false,
-      ); // Mark as not loading since global player handles it
-    } else {
-      // In local mode, prepare audio locally
-      _prepareAudio();
-      _setupPlayerListeners();
+      GlobalAudioPlayerManager.instance.registerGlobalPlayer(
+        widget.audioSource,
+        _stopFromGlobalManager,
+      );
     }
+
+    // Both global and local players work exactly the same way now
+    _prepareAudio();
+    _setupPlayerListeners();
+    
+    // Global players no longer need complex listeners
+    // They work as local players and only notify overlay when needed
   }
 
   @override
@@ -212,76 +206,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
     super.dispose();
   }
 
-  /// Setup global player listener
-  void _setupGlobalPlayerListener() {
-    _globalPlayerSubscription = GlobalAudioPlayerManager.instance.stateStream
-        .listen((state) {
-          if (mounted) {
-            final isNowPlayingGlobally =
-                state?.audioSource == widget.audioSource &&
-                GlobalAudioPlayerManager.instance.hasActivePlayer;
 
-            setState(() {
-              _isPlayingGlobally = isNowPlayingGlobally;
-
-              // Sync local UI state with global player state
-              if (isNowPlayingGlobally) {
-                _isPlaying = state?.isPlaying ?? false;
-                _position = state?.position ?? Duration.zero;
-                _duration = state?.duration ?? Duration.zero;
-
-                // Sync local PlayerController position for waveform display
-                if (state != null && state.position != _position) {
-                  debugPrint(
-                    'AudioPlayerWidget: Global position update: ${state.position.inSeconds}s',
-                  );
-                }
-                _syncLocalPlayerWithGlobalPosition(
-                  state?.position ?? Duration.zero,
-                );
-              } else {
-                _isPlaying = false;
-              }
-            });
-          }
-        });
-  }
-
-  /// Sync local PlayerController position with global player for waveform display
-  void _syncLocalPlayerWithGlobalPosition(Duration globalPosition) async {
-    // For global mode, we sync less aggressively to avoid interfering with seeking
-    if (widget.enableGlobalPlayer && !_isLoading && !_hasError && mounted) {
-      try {
-        // Only sync every 2 seconds to avoid constant seeking that interferes with user interactions
-        final now = DateTime.now().millisecondsSinceEpoch;
-        if (_lastSyncTime != null && (now - _lastSyncTime!) < 2000) {
-          return;
-        }
-        _lastSyncTime = now;
-
-        // Check if there's a significant difference (more than 3 seconds)
-        final difference = (globalPosition - _position).abs();
-        if (difference.inSeconds < 3) {
-          return; // Don't sync if the difference is small
-        }
-
-        // Ensure local player is paused to avoid audio output
-        if (_playerController?.playerState.isPlaying ?? false) {
-          await _playerController?.pausePlayer();
-        }
-
-        // Seek to global position for waveform sync
-        await _playerController?.seekTo(globalPosition.inMilliseconds);
-
-        debugPrint(
-          'AudioPlayerWidget: Major sync - ${globalPosition.inSeconds}s (diff: ${difference.inSeconds}s)',
-        );
-      } catch (e) {
-        // Ignore sync errors to avoid breaking the player
-        debugPrint('AudioPlayerWidget: Error syncing waveform position: $e');
-      }
-    }
-  }
 
   /// Initialize widget animations
   void _initializeAnimations() {
@@ -315,36 +240,21 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
 
   /// Setup player listeners
   void _setupPlayerListeners() {
-    // Only setup listeners in local mode
-    if (widget.enableGlobalPlayer) return;
+    // Both global and local players setup listeners the same way
 
     _durationSubscription = _effectivePlayerController.onCurrentDurationChanged.listen((
       duration,
     ) {
       if (mounted) {
         setState(() {
-          final newPosition = Duration(milliseconds: duration);
-
-          // In global mode, don't update position from local player changes
-          // Position comes from GlobalAudioPlayerManager
-          if (widget.enableGlobalPlayer && _isPlayingGlobally) {
-            // Only forward seeks to global player if there's a significant jump
-            // This indicates user interaction with the waveform
-            final difference = (newPosition - _position).abs();
-
-            if (difference.inSeconds > 3) {
-              debugPrint(
-                'AudioPlayerWidget: Large position jump detected, forwarding to global player: ${newPosition.inSeconds}s',
-              );
-              // This is likely a user seek, forward to global player
-              GlobalAudioPlayerManager.instance.seekTo(newPosition);
-            }
-            return; // Don't update local position in global mode
-          }
-
-          // Normal local playback - update position
-          _position = newPosition;
+          // Both global and local players update position the same way
+          _position = Duration(milliseconds: duration);
         });
+        
+        // If this is a global player, update the overlay with position changes
+        if (widget.enableGlobalPlayer && !_isLoading) {
+          _notifyGlobalPlayback();
+        }
       }
     });
   }
@@ -367,9 +277,6 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
 
   /// Prepare audio for playback
   Future<void> _prepareAudio() async {
-    // Don't prepare audio in global mode to save memory
-    if (widget.enableGlobalPlayer) return;
-
     _setLoadingState(true);
 
     try {
@@ -530,20 +437,13 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
 
   /// Toggle between play and pause
   Future<void> _togglePlayPause() async {
-    if (widget.enableGlobalPlayer) {
-      // Handle global player control
-      if (_isPlayingGlobally) {
-        // If already playing globally, toggle global player
-        await GlobalAudioPlayerManager.instance.togglePlayPause();
-      } else {
-        // Start global playback
-        await _startGlobalPlayback();
-      }
-      return;
-    }
-
-    // Local playback logic (original behavior)
+    // Both global and local players now work the same way
     try {
+      // If this is a global player starting to play, stop any existing global player first
+      if (widget.enableGlobalPlayer && !_isPlaying) {
+        await _stopOtherGlobalPlayers();
+      }
+
       if (_isPlaying) {
         await _effectivePlayerController.pausePlayer();
       } else {
@@ -555,31 +455,70 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
           _isPlaying = !_isPlaying;
         });
       }
+
+      // If this is a global player, always notify the overlay of state changes
+      if (widget.enableGlobalPlayer) {
+        await _notifyGlobalPlayback();
+      }
     } catch (e) {
       // Handle playback errors with recovery
       await _handlePlayerError(e);
     }
   }
 
-  /// Start global playback
-  Future<void> _startGlobalPlayback() async {
+
+
+  /// Notify the global overlay about this player becoming active
+  Future<void> _notifyGlobalPlayback() async {
     try {
-      await GlobalAudioPlayerManager.instance.startGlobalPlayback(
+      // Create overlay state that mirrors this player's state
+      await GlobalAudioPlayerManager.instance.syncWithLocalPlayer(
         audioSource: widget.audioSource,
+        playerController: _effectivePlayerController,
+        isPlaying: _isPlaying,
+        position: _position,
+        duration: _duration,
         color: widget.color,
         playIcon: widget.playIcon,
         pauseIcon: widget.pauseIcon,
         waveStyle: widget.waveStyle,
         showSeekLine: widget.showSeekLine,
-        cacheConfig: widget.localCacheConfig,
       );
     } catch (e) {
-      widget.onAudioError?.call(e.toString());
+      debugPrint('AudioPlayerWidget: Error notifying global playback: $e');
     }
   }
 
+  /// Stop other global players before starting this one
+  Future<void> _stopOtherGlobalPlayers() async {
+    await GlobalAudioPlayerManager.instance.stopOtherGlobalPlayers(widget.audioSource);
+  }
+
+  /// Stop this player when called by global manager
+  void _stopFromGlobalManager() {
+    if (mounted && _isPlaying) {
+      log('AudioPlayerWidget: Stopping due to global manager request: ${widget.audioSource}');
+      _effectivePlayerController.pausePlayer().then((_) {
+        if (mounted) {
+          setState(() {
+            _isPlaying = false;
+          });
+        }
+      }).catchError((e) {
+        log('AudioPlayerWidget: Error stopping player: $e');
+      });
+    }
+  }
+
+
+
   /// Clean up resources
   void _cleanup() {
+    // Unregister global player if enabled
+    if (widget.enableGlobalPlayer) {
+      GlobalAudioPlayerManager.instance.unregisterGlobalPlayer(widget.audioSource);
+    }
+
     _restoreConfig?.call();
     _durationSubscription?.cancel();
     _globalPlayerSubscription?.cancel();
@@ -642,13 +581,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
 
   @override
   Widget build(BuildContext context) {
-    // If global player is enabled, the local player works normally
-    // but starts global playback instead of local playback
-    if (widget.enableGlobalPlayer) {
-      // Always show normal player UI, but onTogglePlayPause will handle global logic
-      // No special UI changes - player looks and acts the same
-    }
-
+    // Identical build logic for both global and local players
     if (_isLoading) {
       return AudioPlayerPlaceholder(
         width: widget.width,
@@ -674,6 +607,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
       );
     }
 
+    // Both global and local players show content the same way
     return AudioPlayerContent(
       width: widget.width,
       height: widget.height,
@@ -700,6 +634,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
       onTogglePlayPause: _togglePlayPause,
       leftWidget: widget.leftWidget,
       rightWidget: widget.rightWidget,
+      waveformData: null, // Waveform comes from the player controller itself
     );
   }
 }

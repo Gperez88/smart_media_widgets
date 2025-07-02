@@ -60,6 +60,7 @@ class _GlobalAudioPlayerOverlayState
 
   SmartGlobalAudioPlayerState? _currentState;
   double _playbackSpeed = 1.0;
+  bool _hasEverBeenPlayed = false;
 
   @override
   void initState() {
@@ -101,12 +102,23 @@ class _GlobalAudioPlayerOverlayState
   void _listenToGlobalPlayer() {
     GlobalAudioPlayerManager.instance.stateStream.listen((state) {
       if (mounted) {
+        // Track if the audio has ever been played
+        if (state != null && state.isPlaying && !state.isLoading) {
+          _hasEverBeenPlayed = true;
+        }
+        
+        // Reset the flag when state becomes null (player stopped/cleared)
+        if (state == null) {
+          _hasEverBeenPlayed = false;
+        }
+        
         setState(() {
           _currentState = state;
         });
 
         // Show/hide overlay based on state
-        if (state != null && state.errorMessage == null) {
+        // Show overlay when there's an active global playback (loading, playing, or paused after being played)
+        if (state != null && state.errorMessage == null && (state.isLoading || state.isPlaying || _hasEverBeenPlayed)) {
           _slideController.forward();
         } else {
           _slideController.reverse();
@@ -126,7 +138,16 @@ class _GlobalAudioPlayerOverlayState
 
   /// Handle close button press
   Future<void> _onClose() async {
-    await GlobalAudioPlayerManager.instance.stopGlobalPlayback();
+    final manager = GlobalAudioPlayerManager.instance;
+    final currentState = _currentState;
+    
+    if (currentState != null) {
+      // Stop all global players (this will stop the currently active one)
+      await manager.stopOtherGlobalPlayers(''); // Empty string means stop all
+    }
+    
+    // Then stop global playback which will clean up the overlay
+    await manager.stopGlobalPlayback();
   }
 
   /// Handle tap on progress bar to seek

@@ -30,6 +30,7 @@ class AudioPlayerContent extends StatelessWidget {
   final VoidCallback onTogglePlayPause;
   final Widget? leftWidget;
   final Widget? rightWidget;
+  final List<double>? waveformData;
 
   const AudioPlayerContent({
     super.key,
@@ -58,6 +59,7 @@ class AudioPlayerContent extends StatelessWidget {
     required this.onTogglePlayPause,
     this.leftWidget,
     this.rightWidget,
+    this.waveformData,
   });
 
   @override
@@ -119,6 +121,7 @@ class AudioPlayerContent extends StatelessWidget {
                         position: position,
                         duration: duration,
                         timeTextStyle: timeTextStyle,
+                        waveformData: waveformData,
                       ),
                     ),
                     if (rightWidget != null) ...[

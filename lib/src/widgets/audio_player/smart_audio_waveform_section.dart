@@ -16,6 +16,7 @@ class AudioWaveformSection extends StatelessWidget {
   final Duration position;
   final Duration duration;
   final TextStyle? timeTextStyle;
+  final List<double>? waveformData;
 
   const AudioWaveformSection({
     super.key,
@@ -31,6 +32,7 @@ class AudioWaveformSection extends StatelessWidget {
     required this.duration,
     this.timeTextStyle,
     this.enableSeekGesture = true,
+    this.waveformData,
   });
 
   @override
@@ -40,12 +42,20 @@ class AudioWaveformSection extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Expanded(
-          child: AudioFileWaveforms(
-            size: Size((width ?? 240) - 80, (height ?? 80) - 60),
-            playerController: playerController,
-            waveformType: WaveformType.fitWidth,
-            playerWaveStyle: waveStyle ?? _getDefaultWaveStyle(),
-          ),
+          child: waveformData != null
+              ? AudioFileWaveforms(
+                  size: Size((width ?? 240) - 80, (height ?? 80) - 60),
+                  playerController: playerController,
+                  waveformType: WaveformType.fitWidth,
+                  playerWaveStyle: waveStyle ?? _getDefaultWaveStyle(),
+                  waveformData: waveformData!,
+                )
+              : AudioFileWaveforms(
+                  size: Size((width ?? 240) - 80, (height ?? 80) - 60),
+                  playerController: playerController,
+                  waveformType: WaveformType.fitWidth,
+                  playerWaveStyle: waveStyle ?? _getDefaultWaveStyle(),
+                ),
         ),
         if (showDuration || showPosition)
           Padding(

@@ -83,9 +83,107 @@ class GlobalAudioPlayerManager {
   // Player management
   PlayerController? _playerController;
   StreamSubscription? _durationSubscription;
+  
+  // Track if we're synced with a local player
+  bool _isSyncedWithLocalPlayer = false;
+  
+  // Keep track of active global players to stop them when needed
+  final Map<String, Function()> _activeGlobalPlayers = {};
 
   List<double>? _currentWaveformData;
   List<double>? get currentWaveformData => _currentWaveformData;
+  
+  // Cache de waveforms por audioSource
+  final Map<String, List<double>> _waveformCache = {};
+  
+  /// Get waveform data for a specific audio source
+  List<double>? getWaveformData(String audioSource) {
+    return _waveformCache[audioSource];
+  }
+  
+  /// Extract and cache waveform for an audio source (without starting playback)
+  Future<List<double>?> extractWaveformForSource(String audioSource) async {
+    // Check if already cached
+    if (_waveformCache.containsKey(audioSource)) {
+      return _waveformCache[audioSource];
+    }
+    
+    try {
+      log('GlobalAudioPlayerManager: Extracting waveform for: $audioSource');
+      
+      // Create temporary player controller for waveform extraction
+      final tempController = PlayerController();
+      
+      try {
+        // Resolve audio path
+        final audioPath = await _resolveAudioPath(audioSource);
+        
+        // Prepare player for waveform extraction only
+        await tempController.preparePlayer(
+          path: audioPath,
+          shouldExtractWaveform: true,
+        );
+        
+        // Extract waveform
+        final waveformData = await tempController.extractWaveformData(
+          path: audioPath,
+        );
+        
+        // Cache the result
+        _waveformCache[audioSource] = waveformData;
+        log('GlobalAudioPlayerManager: Successfully cached waveform for: $audioSource');
+        
+        return waveformData;
+      } finally {
+        // Always dispose temporary controller
+        tempController.dispose();
+      }
+    } catch (e) {
+      log('GlobalAudioPlayerManager: Error extracting waveform for $audioSource: $e');
+      return null;
+    }
+  }
+
+  /// Sync overlay with a local player that just started playing
+  Future<void> syncWithLocalPlayer({
+    required String audioSource,
+    required PlayerController playerController,
+    required bool isPlaying,
+    required Duration position,
+    required Duration duration,
+    Color color = const Color(0xFF1976D2),
+    IconData playIcon = Icons.play_arrow,
+    IconData pauseIcon = Icons.pause,
+    PlayerWaveStyle? waveStyle,
+    bool showSeekLine = true,
+  }) async {
+    log('GlobalAudioPlayerManager: Syncing with local player: $audioSource');
+
+    // Mark as synced mode
+    _isSyncedWithLocalPlayer = true;
+
+    // Create state that mirrors the local player
+    _currentState = SmartGlobalAudioPlayerState(
+      audioSource: audioSource,
+      playerController: playerController, // Use the local player's controller
+      isPlaying: isPlaying,
+      isLoading: false,
+      position: position,
+      duration: duration,
+      color: color,
+      playIcon: playIcon,
+      pauseIcon: pauseIcon,
+      waveStyle: waveStyle,
+      showSeekLine: showSeekLine,
+    );
+
+    // Use cached waveform if available
+    _currentWaveformData = _waveformCache[audioSource];
+
+    _notifyStateChange();
+    
+    log('GlobalAudioPlayerManager: Synced with local player for: $audioSource');
+  }
 
   // Getters
   SmartGlobalAudioPlayerState? get currentState => _currentState;
@@ -103,10 +201,14 @@ class GlobalAudioPlayerManager {
     PlayerWaveStyle? waveStyle,
     bool showSeekLine = true,
     CacheConfig? cacheConfig,
+    bool autoPlay = true,
   }) async {
     try {
       // Stop current player if any
       await stopGlobalPlayback();
+
+      // Mark as global mode (not synced)
+      _isSyncedWithLocalPlayer = false;
 
       // Create new player controller
       _playerController = PlayerController();
@@ -166,6 +268,12 @@ class GlobalAudioPlayerManager {
           _currentWaveformData = await _playerController!.extractWaveformData(
             path: audioPath,
           );
+          
+          // Cache the waveform data for this audio source
+          if (_currentWaveformData != null) {
+            _waveformCache[audioSource] = _currentWaveformData!;
+            log('GlobalAudioPlayerManager: Cached waveform for: $audioSource');
+          }
         } catch (e) {
           log('GlobalAudioPlayerManager: Error extracting waveform: $e');
           _currentWaveformData = null;
@@ -185,8 +293,10 @@ class GlobalAudioPlayerManager {
 
         _notifyStateChange();
 
-        // Start playback immediately since user pressed play
-        await togglePlayPause();
+        // Start playback inmediatamente solo si autoPlay es true
+        if (autoPlay) {
+          await togglePlayPause();
+        }
       } finally {
         // Restore cache config
         restoreConfig?.call();
@@ -206,22 +316,37 @@ class GlobalAudioPlayerManager {
 
   /// Toggle play/pause
   Future<void> togglePlayPause() async {
-    if (_playerController == null || _currentState == null) {
-      log('GlobalAudioPlayerManager: Cannot toggle - no controller or state');
+    if (_currentState == null) {
+      log('GlobalAudioPlayerManager: Cannot toggle - no state');
       return;
     }
 
     try {
       log(
-        'GlobalAudioPlayerManager: Toggling playback - current isPlaying: ${_currentState!.isPlaying}',
+        'GlobalAudioPlayerManager: Toggling playback - current isPlaying: ${_currentState!.isPlaying}, synced: $_isSyncedWithLocalPlayer',
       );
+
+      PlayerController? controllerToUse;
+      
+      if (_isSyncedWithLocalPlayer) {
+        // In synced mode, use the local player's controller from the state
+        controllerToUse = _currentState!.playerController;
+      } else {
+        // In global mode, use our own controller
+        controllerToUse = _playerController;
+      }
+
+      if (controllerToUse == null) {
+        log('GlobalAudioPlayerManager: Cannot toggle - no controller available');
+        return;
+      }
 
       if (_currentState!.isPlaying) {
         log('GlobalAudioPlayerManager: Pausing player');
-        await _playerController!.pausePlayer();
+        await controllerToUse.pausePlayer();
       } else {
         log('GlobalAudioPlayerManager: Starting player');
-        await _playerController!.startPlayer();
+        await controllerToUse.startPlayer();
       }
 
       _currentState = _currentState!.copyWith(
@@ -244,7 +369,8 @@ class GlobalAudioPlayerManager {
 
   /// Stop global playback and cleanup
   Future<void> stopGlobalPlayback() async {
-    if (_playerController != null) {
+    if (_playerController != null && !_isSyncedWithLocalPlayer) {
+      // Only dispose our own controller, not the local player's controller
       try {
         await _playerController!.stopPlayer();
         _playerController!.dispose();
@@ -256,8 +382,41 @@ class GlobalAudioPlayerManager {
     _durationSubscription?.cancel();
     _playerController = null;
     _currentState = null;
+    _isSyncedWithLocalPlayer = false; // Reset sync flag
+    _activeGlobalPlayers.clear(); // Clear all registered players
 
     _notifyStateChange();
+  }
+
+  /// Register a global player
+  void registerGlobalPlayer(String audioSource, Function() stopCallback) {
+    _activeGlobalPlayers[audioSource] = stopCallback;
+    log('GlobalAudioPlayerManager: Registered global player: $audioSource');
+  }
+
+  /// Unregister a global player
+  void unregisterGlobalPlayer(String audioSource) {
+    _activeGlobalPlayers.remove(audioSource);
+    log('GlobalAudioPlayerManager: Unregistered global player: $audioSource');
+  }
+
+  /// Stop all other global players except the specified one
+  /// If exceptAudioSource is empty, stops all players
+  Future<void> stopOtherGlobalPlayers(String exceptAudioSource) async {
+    final playersToStop = exceptAudioSource.isEmpty 
+        ? _activeGlobalPlayers.entries.toList()
+        : _activeGlobalPlayers.entries
+            .where((entry) => entry.key != exceptAudioSource)
+            .toList();
+    
+    for (final entry in playersToStop) {
+      log('GlobalAudioPlayerManager: Stopping global player: ${entry.key}');
+      try {
+        entry.value(); // Call the stop callback
+      } catch (e) {
+        log('GlobalAudioPlayerManager: Error stopping player ${entry.key}: $e');
+      }
+    }
   }
 
   /// Check if this audio source is currently playing globally
