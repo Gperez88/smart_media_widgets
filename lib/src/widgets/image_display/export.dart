@@ -1,1 +1,1 @@
-export 'image_display_widget.dart';
+export 'smart_image_display_widget.dart';

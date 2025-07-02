@@ -1,7 +1,7 @@
 import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:flutter/material.dart';
 
-import 'audio_time_display.dart';
+import 'smart_audio_time_display.dart';
 
 class AudioWaveformSection extends StatelessWidget {
   final PlayerController playerController;
@@ -27,7 +27,6 @@ class AudioWaveformSection extends StatelessWidget {
     required this.showDuration,
     required this.showPosition,
     required this.isPlaying,
-
     required this.position,
     required this.duration,
     this.timeTextStyle,
@@ -42,9 +41,8 @@ class AudioWaveformSection extends StatelessWidget {
       children: [
         Expanded(
           child: AudioFileWaveforms(
-            enableSeekGesture: enableSeekGesture,
-            playerController: playerController,
             size: Size((width ?? 240) - 80, (height ?? 80) - 60),
+            playerController: playerController,
             waveformType: WaveformType.fitWidth,
             playerWaveStyle: waveStyle ?? _getDefaultWaveStyle(),
           ),

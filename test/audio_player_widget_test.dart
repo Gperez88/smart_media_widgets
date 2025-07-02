@@ -11,12 +11,12 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
@@ -25,24 +25,24 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testLocalAudioPath,
           width: 300,
           height: 80,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
     testWidgets('creates with custom dimensions', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 400,
           height: 120,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
@@ -51,26 +51,26 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           borderRadius: BorderRadius.all(Radius.circular(20)),
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
     testWidgets('creates with custom color', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           color: Colors.red,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
@@ -79,39 +79,39 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           backgroundColor: Colors.blue,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
     testWidgets('creates with custom play icon', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           playIcon: Icons.play_circle_fill,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
     testWidgets('creates with custom pause icon', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           pauseIcon: Icons.pause_circle_filled,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
@@ -120,26 +120,26 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           animationDuration: Duration(milliseconds: 500),
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
     testWidgets('creates with custom placeholder', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           placeholder: Center(child: CircularProgressIndicator()),
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
@@ -148,27 +148,27 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: 'https://invalid-url-that-will-fail.com/audio.mp3',
           width: 300,
           height: 80,
           errorWidget: Center(child: Text('Error loading audio')),
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
     testWidgets('creates with local cache config', (WidgetTester tester) async {
       await TestUtils.testWidgetWithCache(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           localCacheConfig: TestUtils.testCacheConfig,
           useGlobalConfig: false,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
         cacheConfig: TestUtils.testCacheConfig,
       );
     });
@@ -178,26 +178,26 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           showLoadingIndicator: false,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
     testWidgets('creates without seek line', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           showSeekLine: false,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
@@ -206,13 +206,13 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           showDuration: false,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
@@ -221,13 +221,13 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           showPosition: false,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
@@ -236,7 +236,7 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
@@ -246,46 +246,46 @@ void main() {
             fontWeight: FontWeight.bold,
           ),
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
     testWidgets('creates without bubble style', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           useBubbleStyle: false,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
     testWidgets('creates with custom padding', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           padding: EdgeInsets.all(16),
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
     testWidgets('creates with custom margin', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           margin: EdgeInsets.symmetric(vertical: 8),
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
@@ -294,7 +294,7 @@ void main() {
 
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: AudioPlayerWidget(
+        widget: SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
@@ -302,7 +302,7 @@ void main() {
             callbackCalled = true;
           },
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
 
       // Note: In a real test environment, you would wait for the audio to load
@@ -315,7 +315,7 @@ void main() {
 
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: AudioPlayerWidget(
+        widget: SmartAudioPlayerWidget(
           audioSource: 'https://invalid-url-that-will-fail.com/audio.mp3',
           width: 300,
           height: 80,
@@ -323,7 +323,7 @@ void main() {
             errorMessage = error;
           },
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
 
       // Note: In a real test environment, you would wait for the error to occur
@@ -344,8 +344,12 @@ void main() {
       for (final url in audioUrls) {
         await TestUtils.testWidgetCreation(
           tester: tester,
-          widget: AudioPlayerWidget(audioSource: url, width: 300, height: 80),
-          expectedType: AudioPlayerWidget,
+          widget: SmartAudioPlayerWidget(
+            audioSource: url,
+            width: 300,
+            height: 80,
+          ),
+          expectedType: SmartAudioPlayerWidget,
         );
       }
     });
@@ -360,8 +364,12 @@ void main() {
       for (final path in localPaths) {
         await TestUtils.testWidgetCreation(
           tester: tester,
-          widget: AudioPlayerWidget(audioSource: path, width: 300, height: 80),
-          expectedType: AudioPlayerWidget,
+          widget: SmartAudioPlayerWidget(
+            audioSource: path,
+            width: 300,
+            height: 80,
+          ),
+          expectedType: SmartAudioPlayerWidget,
         );
       }
     });
@@ -369,12 +377,12 @@ void main() {
     testWidgets('handles file:// protocol paths', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: 'file:///path/to/local/audio.mp3',
           width: 300,
           height: 80,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
@@ -383,18 +391,18 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
 
       // Update the widget with a different audio source
       await tester.pumpWidget(
         TestUtils.createTestApp(
-          child: const AudioPlayerWidget(
+          child: const SmartAudioPlayerWidget(
             audioSource:
                 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
             width: 300,
@@ -403,7 +411,7 @@ void main() {
         ),
       );
 
-      expect(find.byType(AudioPlayerWidget), findsOneWidget);
+      expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
     });
 
     testWidgets('updates when cache config changes', (
@@ -411,13 +419,13 @@ void main() {
     ) async {
       await TestUtils.testWidgetWithCache(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
           localCacheConfig: TestUtils.testCacheConfig,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
         cacheConfig: TestUtils.testCacheConfig,
       );
 
@@ -428,7 +436,7 @@ void main() {
 
       await tester.pumpWidget(
         TestUtils.createTestAppWithCache(
-          child: const AudioPlayerWidget(
+          child: const SmartAudioPlayerWidget(
             audioSource: TestUtils.testAudioUrl,
             width: 300,
             height: 80,
@@ -438,7 +446,7 @@ void main() {
         ),
       );
 
-      expect(find.byType(AudioPlayerWidget), findsOneWidget);
+      expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
       expect(find.byType(CacheConfigScope), findsOneWidget);
     });
 
@@ -448,12 +456,12 @@ void main() {
       for (final height in heights) {
         await TestUtils.testWidgetCreation(
           tester: tester,
-          widget: AudioPlayerWidget(
+          widget: SmartAudioPlayerWidget(
             audioSource: TestUtils.testAudioUrl,
             width: 300,
             height: height.toDouble(),
           ),
-          expectedType: AudioPlayerWidget,
+          expectedType: SmartAudioPlayerWidget,
         );
       }
     });
@@ -463,8 +471,10 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(audioSource: TestUtils.testAudioUrl),
-        expectedType: AudioPlayerWidget,
+        widget: const SmartAudioPlayerWidget(
+          audioSource: TestUtils.testAudioUrl,
+        ),
+        expectedType: SmartAudioPlayerWidget,
       );
     });
 
@@ -473,7 +483,7 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const AudioPlayerWidget(
+        widget: const SmartAudioPlayerWidget(
           audioSource: TestUtils.testAudioUrl,
           width: 300,
           height: 80,
@@ -483,7 +493,7 @@ void main() {
           showPosition: false,
           useBubbleStyle: false,
         ),
-        expectedType: AudioPlayerWidget,
+        expectedType: SmartAudioPlayerWidget,
       );
     });
   });
@@ -494,7 +504,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: AudioPlayerWidget(
+            body: SmartAudioPlayerWidget(
               audioSource: 'https://example.com/test-audio.mp3',
               onAudioError: (error) {
                 // Should not be called for cache clearing
@@ -512,7 +522,7 @@ void main() {
       // The widget should handle this gracefully and fall back to remote URL
 
       // Verify the widget is still functional
-      expect(find.byType(AudioPlayerWidget), findsOneWidget);
+      expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
     });
 
     testWidgets('should recover from file not found errors', (tester) async {
@@ -520,7 +530,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: AudioPlayerWidget(
+            body: SmartAudioPlayerWidget(
               audioSource: 'https://example.com/test-audio.mp3',
               onAudioError: (error) {
                 // Should handle file not found gracefully
@@ -534,7 +544,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // The widget should handle missing cache files gracefully
-      expect(find.byType(AudioPlayerWidget), findsOneWidget);
+      expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
     });
   });
 }

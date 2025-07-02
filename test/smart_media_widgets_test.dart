@@ -26,12 +26,12 @@ void main() {
 
         await TestUtils.testWidgetWithCache(
           tester: tester,
-          widget: const ImageDisplayWidget(
+          widget: const SmartImageDisplayWidget(
             imageSource: TestUtils.testImageUrl,
             width: 200,
             height: 300,
           ),
-          expectedType: ImageDisplayWidget,
+          expectedType: SmartAudioPlayerWidget,
           cacheConfig: testConfig,
         );
       });
@@ -57,7 +57,7 @@ void main() {
             child: const SingleChildScrollView(
               child: Column(
                 children: [
-                  ImageDisplayWidget(
+                  SmartImageDisplayWidget(
                     imageSource: TestUtils.testImageUrl,
                     width: 200,
                     height: 300,
@@ -65,7 +65,7 @@ void main() {
                     useGlobalConfig: false,
                   ),
                   SizedBox(height: 16),
-                  VideoPlayerWidget(
+                  SmartVideoPlayerWidget(
                     videoSource: TestUtils.testVideoUrl,
                     width: 400,
                     height: 300,
@@ -73,7 +73,7 @@ void main() {
                     useGlobalConfig: false,
                   ),
                   SizedBox(height: 16),
-                  AudioPlayerWidget(
+                  SmartAudioPlayerWidget(
                     audioSource: TestUtils.testAudioUrl,
                     width: 300,
                     height: 80,
@@ -86,9 +86,9 @@ void main() {
           ),
         );
 
-        expect(find.byType(ImageDisplayWidget), findsOneWidget);
-        expect(find.byType(VideoPlayerWidget), findsOneWidget);
-        expect(find.byType(AudioPlayerWidget), findsOneWidget);
+        expect(find.byType(SmartImageDisplayWidget), findsOneWidget);
+        expect(find.byType(SmartVideoPlayerWidget), findsOneWidget);
+        expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
       });
 
       testWidgets('Widgets with cache disabled', (WidgetTester tester) async {
@@ -97,21 +97,21 @@ void main() {
             child: const SingleChildScrollView(
               child: Column(
                 children: [
-                  ImageDisplayWidget(
+                  SmartImageDisplayWidget(
                     imageSource: TestUtils.testImageUrl,
                     width: 200,
                     height: 300,
                     disableCache: true,
                   ),
                   SizedBox(height: 16),
-                  VideoPlayerWidget(
+                  SmartVideoPlayerWidget(
                     videoSource: TestUtils.testVideoUrl,
                     width: 400,
                     height: 300,
                     disableCache: true,
                   ),
                   SizedBox(height: 16),
-                  AudioPlayerWidget(
+                  SmartAudioPlayerWidget(
                     audioSource: TestUtils.testAudioUrl,
                     width: 300,
                     height: 80,
@@ -124,9 +124,9 @@ void main() {
 
         // Solo un pump para evitar timeout por animaciones/reproductores
         await tester.pump(const Duration(milliseconds: 100));
-        expect(find.byType(ImageDisplayWidget), findsOneWidget);
-        expect(find.byType(VideoPlayerWidget), findsOneWidget);
-        expect(find.byType(AudioPlayerWidget), findsOneWidget);
+        expect(find.byType(SmartImageDisplayWidget), findsOneWidget);
+        expect(find.byType(SmartVideoPlayerWidget), findsOneWidget);
+        expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
       });
 
       testWidgets('Widgets with global cache config', (
@@ -146,19 +146,19 @@ void main() {
             child: const SingleChildScrollView(
               child: Column(
                 children: [
-                  ImageDisplayWidget(
+                  SmartImageDisplayWidget(
                     imageSource: TestUtils.testImageUrl,
                     width: 200,
                     height: 300,
                   ),
                   SizedBox(height: 16),
-                  VideoPlayerWidget(
+                  SmartVideoPlayerWidget(
                     videoSource: TestUtils.testVideoUrl,
                     width: 400,
                     height: 300,
                   ),
                   SizedBox(height: 16),
-                  AudioPlayerWidget(
+                  SmartAudioPlayerWidget(
                     audioSource: TestUtils.testAudioUrl,
                     width: 300,
                     height: 80,
@@ -170,9 +170,9 @@ void main() {
           ),
         );
 
-        expect(find.byType(ImageDisplayWidget), findsOneWidget);
-        expect(find.byType(VideoPlayerWidget), findsOneWidget);
-        expect(find.byType(AudioPlayerWidget), findsOneWidget);
+        expect(find.byType(SmartImageDisplayWidget), findsOneWidget);
+        expect(find.byType(SmartVideoPlayerWidget), findsOneWidget);
+        expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
         expect(find.byType(CacheConfigScope), findsOneWidget);
       });
 
@@ -195,7 +195,7 @@ void main() {
               child: Column(
                 children: [
                   // Uses local config (overrides global)
-                  ImageDisplayWidget(
+                  SmartImageDisplayWidget(
                     imageSource: TestUtils.testImageUrl,
                     width: 200,
                     height: 300,
@@ -203,14 +203,14 @@ void main() {
                   ),
                   SizedBox(height: 16),
                   // Uses global config
-                  VideoPlayerWidget(
+                  SmartVideoPlayerWidget(
                     videoSource: TestUtils.testVideoUrl,
                     width: 400,
                     height: 300,
                   ),
                   SizedBox(height: 16),
                   // Uses global config
-                  AudioPlayerWidget(
+                  SmartAudioPlayerWidget(
                     audioSource: TestUtils.testAudioUrl,
                     width: 300,
                     height: 80,
@@ -222,9 +222,9 @@ void main() {
           ),
         );
 
-        expect(find.byType(ImageDisplayWidget), findsOneWidget);
-        expect(find.byType(VideoPlayerWidget), findsOneWidget);
-        expect(find.byType(AudioPlayerWidget), findsOneWidget);
+        expect(find.byType(SmartImageDisplayWidget), findsOneWidget);
+        expect(find.byType(SmartVideoPlayerWidget), findsOneWidget);
+        expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
         expect(find.byType(CacheConfigScope), findsOneWidget);
       });
 
@@ -237,42 +237,42 @@ void main() {
               child: Column(
                 children: [
                   // Remote image
-                  ImageDisplayWidget(
+                  SmartImageDisplayWidget(
                     imageSource: TestUtils.testImageUrl,
                     width: 200,
                     height: 300,
                   ),
                   SizedBox(height: 16),
                   // Local image
-                  ImageDisplayWidget(
+                  SmartImageDisplayWidget(
                     imageSource: TestUtils.testLocalImagePath,
                     width: 200,
                     height: 300,
                   ),
                   SizedBox(height: 16),
                   // Remote video
-                  VideoPlayerWidget(
+                  SmartVideoPlayerWidget(
                     videoSource: TestUtils.testVideoUrl,
                     width: 400,
                     height: 300,
                   ),
                   SizedBox(height: 16),
                   // Local video
-                  VideoPlayerWidget(
+                  SmartVideoPlayerWidget(
                     videoSource: TestUtils.testLocalVideoPath,
                     width: 400,
                     height: 300,
                   ),
                   SizedBox(height: 16),
                   // Remote audio
-                  AudioPlayerWidget(
+                  SmartAudioPlayerWidget(
                     audioSource: TestUtils.testAudioUrl,
                     width: 300,
                     height: 80,
                   ),
                   SizedBox(height: 16),
                   // Local audio
-                  AudioPlayerWidget(
+                  SmartAudioPlayerWidget(
                     audioSource: TestUtils.testLocalAudioPath,
                     width: 300,
                     height: 80,
@@ -283,9 +283,9 @@ void main() {
           ),
         );
 
-        expect(find.byType(ImageDisplayWidget), findsNWidgets(2));
-        expect(find.byType(VideoPlayerWidget), findsNWidgets(2));
-        expect(find.byType(AudioPlayerWidget), findsNWidgets(2));
+        expect(find.byType(SmartImageDisplayWidget), findsNWidgets(2));
+        expect(find.byType(SmartVideoPlayerWidget), findsNWidgets(2));
+        expect(find.byType(SmartAudioPlayerWidget), findsNWidgets(2));
       });
 
       testWidgets('Widgets with error handling', (WidgetTester tester) async {
@@ -294,7 +294,7 @@ void main() {
             child: const SingleChildScrollView(
               child: Column(
                 children: [
-                  ImageDisplayWidget(
+                  SmartImageDisplayWidget(
                     imageSource:
                         'https://invalid-url-that-will-fail.com/image.jpg',
                     width: 200,
@@ -302,7 +302,7 @@ void main() {
                     errorWidget: Center(child: Text('Image Error')),
                   ),
                   SizedBox(height: 16),
-                  VideoPlayerWidget(
+                  SmartVideoPlayerWidget(
                     videoSource:
                         'https://invalid-url-that-will-fail.com/video.mp4',
                     width: 400,
@@ -310,7 +310,7 @@ void main() {
                     errorWidget: Center(child: Text('Video Error')),
                   ),
                   SizedBox(height: 16),
-                  AudioPlayerWidget(
+                  SmartAudioPlayerWidget(
                     audioSource:
                         'https://invalid-url-that-will-fail.com/audio.mp3',
                     width: 300,
@@ -323,9 +323,9 @@ void main() {
           ),
         );
 
-        expect(find.byType(ImageDisplayWidget), findsOneWidget);
-        expect(find.byType(VideoPlayerWidget), findsOneWidget);
-        expect(find.byType(AudioPlayerWidget), findsOneWidget);
+        expect(find.byType(SmartImageDisplayWidget), findsOneWidget);
+        expect(find.byType(SmartVideoPlayerWidget), findsOneWidget);
+        expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
       });
 
       testWidgets('Widgets with custom placeholders', (
@@ -336,21 +336,21 @@ void main() {
             child: const SingleChildScrollView(
               child: Column(
                 children: [
-                  ImageDisplayWidget(
+                  SmartImageDisplayWidget(
                     imageSource: TestUtils.testImageUrl,
                     width: 200,
                     height: 300,
                     placeholder: Center(child: CircularProgressIndicator()),
                   ),
                   SizedBox(height: 16),
-                  VideoPlayerWidget(
+                  SmartVideoPlayerWidget(
                     videoSource: TestUtils.testVideoUrl,
                     width: 400,
                     height: 300,
                     placeholder: Center(child: CircularProgressIndicator()),
                   ),
                   SizedBox(height: 16),
-                  AudioPlayerWidget(
+                  SmartAudioPlayerWidget(
                     audioSource: TestUtils.testAudioUrl,
                     width: 300,
                     height: 80,
@@ -362,9 +362,9 @@ void main() {
           ),
         );
 
-        expect(find.byType(ImageDisplayWidget), findsOneWidget);
-        expect(find.byType(VideoPlayerWidget), findsOneWidget);
-        expect(find.byType(AudioPlayerWidget), findsOneWidget);
+        expect(find.byType(SmartImageDisplayWidget), findsOneWidget);
+        expect(find.byType(SmartVideoPlayerWidget), findsOneWidget);
+        expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
       });
     });
 

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-import 'global_audio_player_manager.dart';
+import 'smart_global_audio_player_manager.dart';
 
 /// Global audio player overlay that appears below the AppBar
 ///
 /// This widget provides a persistent audio player interface that remains
 /// visible across different screens when global playback is active.
 /// Features a minimal, WhatsApp-style design.
-class GlobalAudioPlayerOverlay extends StatefulWidget {
+class SmartGlobalAudioPlayerOverlay extends StatefulWidget {
   /// Height of the global player overlay
   final double height;
 
@@ -33,7 +33,7 @@ class GlobalAudioPlayerOverlay extends StatefulWidget {
   /// If null, defaults to "You yesterday at [current time]"
   final String? subtitleText;
 
-  const GlobalAudioPlayerOverlay({
+  const SmartGlobalAudioPlayerOverlay({
     super.key,
     this.height = 56,
     this.backgroundColor,
@@ -46,18 +46,19 @@ class GlobalAudioPlayerOverlay extends StatefulWidget {
   });
 
   @override
-  State<GlobalAudioPlayerOverlay> createState() =>
+  State<SmartGlobalAudioPlayerOverlay> createState() =>
       _GlobalAudioPlayerOverlayState();
 }
 
-class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
+class _GlobalAudioPlayerOverlayState
+    extends State<SmartGlobalAudioPlayerOverlay>
     with TickerProviderStateMixin {
   late AnimationController _slideController;
   late Animation<Offset> _slideAnimation;
   late AnimationController _scaleController;
   late Animation<double> _scaleAnimation;
 
-  GlobalAudioPlayerState? _currentState;
+  SmartGlobalAudioPlayerState? _currentState;
   double _playbackSpeed = 1.0;
 
   @override
@@ -128,6 +129,38 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
     await GlobalAudioPlayerManager.instance.stopGlobalPlayback();
   }
 
+  /// Handle tap on progress bar to seek
+  void _handleProgressTap(TapUpDetails details) {
+    if (_currentState == null || _currentState!.duration.inMilliseconds == 0) {
+      return;
+    }
+
+    try {
+      // Calculate seek position based on tap location
+      final RenderBox renderBox = context.findRenderObject() as RenderBox;
+      final localPosition = details.localPosition;
+      final progressWidth = renderBox.size.width;
+
+      // Calculate percentage of progress bar tapped
+      final percentage = (localPosition.dx / progressWidth).clamp(0.0, 1.0);
+
+      // Calculate seek time based on total duration
+      final seekTime = Duration(
+        milliseconds: (_currentState!.duration.inMilliseconds * percentage)
+            .round(),
+      );
+
+      // Seek in global player
+      GlobalAudioPlayerManager.instance.seekTo(seekTime);
+
+      debugPrint(
+        'GlobalAudioPlayerOverlay: Seeking to ${seekTime.inSeconds}s (${(percentage * 100).toStringAsFixed(1)}%)',
+      );
+    } catch (e) {
+      debugPrint('GlobalAudioPlayerOverlay: Error handling seek: $e');
+    }
+  }
+
   /// Get effective background color
   Color _getBackgroundColor() {
     if (widget.backgroundColor != null) {
@@ -179,10 +212,33 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
                 _formatPosition(_currentState!.position),
                 style: const TextStyle(color: Colors.white54, fontSize: 11),
               ),
-              const Text(
-                ' / ',
-                style: TextStyle(color: Colors.white54, fontSize: 11),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GestureDetector(
+                  onTapUp: _handleProgressTap,
+                  child: Container(
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: _currentState!.duration.inMilliseconds > 0
+                          ? _currentState!.position.inMilliseconds /
+                                _currentState!.duration.inMilliseconds
+                          : 0.0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
+              const SizedBox(width: 8),
               Text(
                 _formatPosition(_currentState!.duration),
                 style: const TextStyle(color: Colors.white54, fontSize: 11),

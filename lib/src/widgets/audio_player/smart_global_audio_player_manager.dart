@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_media_widgets/smart_media_widgets.dart';
 
 /// Global audio player state
-class GlobalAudioPlayerState {
+class SmartGlobalAudioPlayerState {
   final String audioSource;
   final PlayerController playerController;
   final bool isPlaying;
@@ -21,7 +21,7 @@ class GlobalAudioPlayerState {
   final PlayerWaveStyle? waveStyle;
   final bool showSeekLine;
 
-  const GlobalAudioPlayerState({
+  const SmartGlobalAudioPlayerState({
     required this.audioSource,
     required this.playerController,
     this.isPlaying = false,
@@ -36,7 +36,7 @@ class GlobalAudioPlayerState {
     this.showSeekLine = true,
   });
 
-  GlobalAudioPlayerState copyWith({
+  SmartGlobalAudioPlayerState copyWith({
     String? audioSource,
     PlayerController? playerController,
     bool? isPlaying,
@@ -50,7 +50,7 @@ class GlobalAudioPlayerState {
     PlayerWaveStyle? waveStyle,
     bool? showSeekLine,
   }) {
-    return GlobalAudioPlayerState(
+    return SmartGlobalAudioPlayerState(
       audioSource: audioSource ?? this.audioSource,
       playerController: playerController ?? this.playerController,
       isPlaying: isPlaying ?? this.isPlaying,
@@ -69,23 +69,28 @@ class GlobalAudioPlayerState {
 
 /// Singleton manager for global audio player
 class GlobalAudioPlayerManager {
-  static final GlobalAudioPlayerManager _instance = GlobalAudioPlayerManager._internal();
+  static final GlobalAudioPlayerManager _instance =
+      GlobalAudioPlayerManager._internal();
   static GlobalAudioPlayerManager get instance => _instance;
-  
+
   GlobalAudioPlayerManager._internal();
 
   // State management
-  GlobalAudioPlayerState? _currentState;
-  final StreamController<GlobalAudioPlayerState?> _stateController = 
-      StreamController<GlobalAudioPlayerState?>.broadcast();
-  
+  SmartGlobalAudioPlayerState? _currentState;
+  final StreamController<SmartGlobalAudioPlayerState?> _stateController =
+      StreamController<SmartGlobalAudioPlayerState?>.broadcast();
+
   // Player management
   PlayerController? _playerController;
   StreamSubscription? _durationSubscription;
-  
+
+  List<double>? _currentWaveformData;
+  List<double>? get currentWaveformData => _currentWaveformData;
+
   // Getters
-  GlobalAudioPlayerState? get currentState => _currentState;
-  Stream<GlobalAudioPlayerState?> get stateStream => _stateController.stream;
+  SmartGlobalAudioPlayerState? get currentState => _currentState;
+  Stream<SmartGlobalAudioPlayerState?> get stateStream =>
+      _stateController.stream;
   bool get hasActivePlayer => _currentState != null;
   bool get isPlaying => _currentState?.isPlaying ?? false;
 
@@ -105,9 +110,10 @@ class GlobalAudioPlayerManager {
 
       // Create new player controller
       _playerController = PlayerController();
-      
+      _currentWaveformData = null;
+
       // Create initial state
-      _currentState = GlobalAudioPlayerState(
+      _currentState = SmartGlobalAudioPlayerState(
         audioSource: audioSource,
         playerController: _playerController!,
         isLoading: true,
@@ -117,7 +123,7 @@ class GlobalAudioPlayerManager {
         waveStyle: waveStyle,
         showSeekLine: showSeekLine,
       );
-      
+
       _notifyStateChange();
 
       // Apply cache config temporarily if provided
@@ -138,7 +144,9 @@ class GlobalAudioPlayerManager {
             throw Exception('Invalid remote URL: $audioPath');
           }
           if (!MediaUtils.isValidAudioUrl(audioPath)) {
-            log('GlobalAudioPlayerManager: Warning - URL may not be a valid audio file: $audioPath');
+            log(
+              'GlobalAudioPlayerManager: Warning - URL may not be a valid audio file: $audioPath',
+            );
           }
         } else {
           // For local files (including cached files), verify they exist
@@ -153,34 +161,45 @@ class GlobalAudioPlayerManager {
           shouldExtractWaveform: true,
         );
 
+        // EXTRAER Y GUARDAR EL WAVEFORM
+        try {
+          _currentWaveformData = await _playerController!.extractWaveformData(
+            path: audioPath,
+          );
+        } catch (e) {
+          log('GlobalAudioPlayerManager: Error extracting waveform: $e');
+          _currentWaveformData = null;
+        }
+        _notifyStateChange(); // Notificar que el waveform está listo
+
         // Setup listeners (like local player)
         _setupPlayerListeners();
 
         // Mark as loaded (exactly like local player does)
         _currentState = _currentState!.copyWith(
           isLoading: false,
-          duration: const Duration(minutes: 3), // Default, will be updated by listeners
+          duration: const Duration(
+            minutes: 3,
+          ), // Default, will be updated by listeners
         );
-        
+
         _notifyStateChange();
 
         // Start playback immediately since user pressed play
         await togglePlayPause();
-
       } finally {
         // Restore cache config
         restoreConfig?.call();
       }
-
     } catch (e, stackTrace) {
       log('GlobalAudioPlayerManager: Error starting global playback: $e');
       log('GlobalAudioPlayerManager: Stack trace: $stackTrace');
-      
+
       _currentState = _currentState?.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
       );
-      
+
       _notifyStateChange();
     }
   }
@@ -193,8 +212,10 @@ class GlobalAudioPlayerManager {
     }
 
     try {
-      log('GlobalAudioPlayerManager: Toggling playback - current isPlaying: ${_currentState!.isPlaying}');
-      
+      log(
+        'GlobalAudioPlayerManager: Toggling playback - current isPlaying: ${_currentState!.isPlaying}',
+      );
+
       if (_currentState!.isPlaying) {
         log('GlobalAudioPlayerManager: Pausing player');
         await _playerController!.pausePlayer();
@@ -206,18 +227,17 @@ class GlobalAudioPlayerManager {
       _currentState = _currentState!.copyWith(
         isPlaying: !_currentState!.isPlaying,
       );
-      
-      log('GlobalAudioPlayerManager: Player state updated - new isPlaying: ${_currentState!.isPlaying}');
-      _notifyStateChange();
 
+      log(
+        'GlobalAudioPlayerManager: Player state updated - new isPlaying: ${_currentState!.isPlaying}',
+      );
+      _notifyStateChange();
     } catch (e, stackTrace) {
       log('GlobalAudioPlayerManager: Error toggling playback: $e');
       log('GlobalAudioPlayerManager: Stack trace: $stackTrace');
-      
-      _currentState = _currentState?.copyWith(
-        errorMessage: e.toString(),
-      );
-      
+
+      _currentState = _currentState?.copyWith(errorMessage: e.toString());
+
       _notifyStateChange();
     }
   }
@@ -236,7 +256,7 @@ class GlobalAudioPlayerManager {
     _durationSubscription?.cancel();
     _playerController = null;
     _currentState = null;
-    
+
     _notifyStateChange();
   }
 
@@ -245,11 +265,40 @@ class GlobalAudioPlayerManager {
     return _currentState?.audioSource == audioSource && hasActivePlayer;
   }
 
+  /// Seek to specific position in global player
+  Future<void> seekTo(Duration position) async {
+    if (_playerController == null || _currentState == null) {
+      log('GlobalAudioPlayerManager: Cannot seek - no controller or state');
+      return;
+    }
+
+    try {
+      log('GlobalAudioPlayerManager: Seeking to ${position.inSeconds}s');
+
+      // Seek in player controller
+      await _playerController!.seekTo(position.inMilliseconds);
+
+      // Update state immediately for responsive UI
+      _currentState = _currentState!.copyWith(position: position);
+
+      _notifyStateChange();
+    } catch (e, stackTrace) {
+      log('GlobalAudioPlayerManager: Error seeking: $e');
+      log('GlobalAudioPlayerManager: Stack trace: $stackTrace');
+
+      _currentState = _currentState?.copyWith(errorMessage: e.toString());
+
+      _notifyStateChange();
+    }
+  }
+
   /// Setup player listeners
   void _setupPlayerListeners() {
     if (_playerController == null) return;
 
-    _durationSubscription = _playerController!.onCurrentDurationChanged.listen((duration) {
+    _durationSubscription = _playerController!.onCurrentDurationChanged.listen((
+      duration,
+    ) {
       if (_currentState != null) {
         _currentState = _currentState!.copyWith(
           position: Duration(milliseconds: duration),
@@ -262,18 +311,20 @@ class GlobalAudioPlayerManager {
   /// Resolve audio path (similar to AudioPlayerWidget logic)
   Future<String> _resolveAudioPath(String audioSource) async {
     log('GlobalAudioPlayerManager: Resolving path for: $audioSource');
-    
+
     if (MediaUtils.isRemoteSource(audioSource)) {
       log('GlobalAudioPlayerManager: Detected remote source');
-      
+
       // Check if already cached
       final cachedPath = await CacheManager.getCachedAudioPath(audioSource);
-      
+
       if (cachedPath != null && await _fileExists(cachedPath)) {
         log('GlobalAudioPlayerManager: Using cached path: $cachedPath');
         return cachedPath;
       } else {
-        log('GlobalAudioPlayerManager: Using remote URL directly: $audioSource');
+        log(
+          'GlobalAudioPlayerManager: Using remote URL directly: $audioSource',
+        );
         // Start background download for future cache
         _downloadAudioInBackground(audioSource);
         // Use remote URL directly
@@ -282,7 +333,7 @@ class GlobalAudioPlayerManager {
     } else if (MediaUtils.isLocalSource(audioSource)) {
       log('GlobalAudioPlayerManager: Detected local source');
       final path = MediaUtils.normalizeLocalPath(audioSource);
-      
+
       if (!await _fileExists(path)) {
         throw Exception('Local audio file not found: $path');
       }
@@ -296,9 +347,9 @@ class GlobalAudioPlayerManager {
   /// Check if file exists
   Future<bool> _fileExists(String path) async {
     try {
-      return await Future(() => MediaUtils.isLocalSource(path) 
-          ? File(path).existsSync() 
-          : true);
+      return await Future(
+        () => MediaUtils.isLocalSource(path) ? File(path).existsSync() : true,
+      );
     } catch (e) {
       return false;
     }

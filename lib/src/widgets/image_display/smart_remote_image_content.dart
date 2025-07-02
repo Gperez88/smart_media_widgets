@@ -1,8 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import 'image_error.dart';
-import 'image_placeholder.dart';
+import 'smart_image_error.dart';
+import 'smart_image_placeholder.dart';
 
 class RemoteImageContent extends StatelessWidget {
   final String imageUrl;

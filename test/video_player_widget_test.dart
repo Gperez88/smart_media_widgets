@@ -11,12 +11,12 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
@@ -25,77 +25,77 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testLocalVideoPath,
           width: 400,
           height: 300,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
     testWidgets('creates with auto play enabled', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
           autoPlay: true,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
     testWidgets('creates with looping enabled', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
           looping: true,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
     testWidgets('creates without controls', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
           showControls: false,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
     testWidgets('creates without play button', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
           showPlayButton: false,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
     testWidgets('creates with custom placeholder', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
           placeholder: Center(child: CircularProgressIndicator()),
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
@@ -104,27 +104,27 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: 'https://invalid-url-that-will-fail.com/video.mp4',
           width: 400,
           height: 300,
           errorWidget: Center(child: Text('Error loading video')),
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
     testWidgets('creates with local cache config', (WidgetTester tester) async {
       await TestUtils.testWidgetWithCache(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
           localCacheConfig: TestUtils.testCacheConfig,
           useGlobalConfig: false,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
         cacheConfig: TestUtils.testCacheConfig,
       );
     });
@@ -132,26 +132,26 @@ void main() {
     testWidgets('creates with cache disabled', (WidgetTester tester) async {
       await TestUtils.testWidgetWithCacheDisabled(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
           disableCache: true,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
     testWidgets('creates with preload disabled', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
           preload: false,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
@@ -160,13 +160,13 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
           loadingColor: Colors.red,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
@@ -175,13 +175,13 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
           showLoadingIndicator: false,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
@@ -190,7 +190,7 @@ void main() {
 
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: VideoPlayerWidget(
+        widget: SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
@@ -198,7 +198,7 @@ void main() {
             callbackCalled = true;
           },
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
 
       // Note: In a real test environment, you would wait for the video to load
@@ -211,7 +211,7 @@ void main() {
 
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: VideoPlayerWidget(
+        widget: SmartVideoPlayerWidget(
           videoSource: 'https://invalid-url-that-will-fail.com/video.mp4',
           width: 400,
           height: 300,
@@ -219,7 +219,7 @@ void main() {
             errorMessage = error;
           },
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
 
       // Note: In a real test environment, you would wait for the error to occur
@@ -232,7 +232,7 @@ void main() {
 
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: VideoPlayerWidget(
+        widget: SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
@@ -240,7 +240,7 @@ void main() {
             callbackCalled = true;
           },
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
 
       // Note: In a real test environment, you would wait for the video to play
@@ -253,7 +253,7 @@ void main() {
 
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: VideoPlayerWidget(
+        widget: SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
@@ -261,7 +261,7 @@ void main() {
             callbackCalled = true;
           },
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
 
       // Note: In a real test environment, you would wait for the video to pause
@@ -274,7 +274,7 @@ void main() {
 
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: VideoPlayerWidget(
+        widget: SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
@@ -282,7 +282,7 @@ void main() {
             callbackCalled = true;
           },
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
 
       // Note: In a real test environment, you would wait for the video to end
@@ -304,8 +304,12 @@ void main() {
       for (final url in videoUrls) {
         await TestUtils.testWidgetCreation(
           tester: tester,
-          widget: VideoPlayerWidget(videoSource: url, width: 400, height: 300),
-          expectedType: VideoPlayerWidget,
+          widget: SmartVideoPlayerWidget(
+            videoSource: url,
+            width: 400,
+            height: 300,
+          ),
+          expectedType: SmartVideoPlayerWidget,
         );
       }
     });
@@ -320,8 +324,12 @@ void main() {
       for (final path in localPaths) {
         await TestUtils.testWidgetCreation(
           tester: tester,
-          widget: VideoPlayerWidget(videoSource: path, width: 400, height: 300),
-          expectedType: VideoPlayerWidget,
+          widget: SmartVideoPlayerWidget(
+            videoSource: path,
+            width: 400,
+            height: 300,
+          ),
+          expectedType: SmartVideoPlayerWidget,
         );
       }
     });
@@ -329,12 +337,12 @@ void main() {
     testWidgets('handles file:// protocol paths', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: 'file:///path/to/local/video.mp4',
           width: 400,
           height: 300,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
     });
 
@@ -343,18 +351,18 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
       );
 
       // Update the widget with a different video source
       await tester.pumpWidget(
         TestUtils.createTestApp(
-          child: const VideoPlayerWidget(
+          child: const SmartVideoPlayerWidget(
             videoSource:
                 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
             width: 400,
@@ -363,7 +371,7 @@ void main() {
         ),
       );
 
-      expect(find.byType(VideoPlayerWidget), findsOneWidget);
+      expect(find.byType(SmartVideoPlayerWidget), findsOneWidget);
     });
 
     testWidgets('updates when cache config changes', (
@@ -371,13 +379,13 @@ void main() {
     ) async {
       await TestUtils.testWidgetWithCache(
         tester: tester,
-        widget: const VideoPlayerWidget(
+        widget: const SmartVideoPlayerWidget(
           videoSource: TestUtils.testVideoUrl,
           width: 400,
           height: 300,
           localCacheConfig: TestUtils.testCacheConfig,
         ),
-        expectedType: VideoPlayerWidget,
+        expectedType: SmartVideoPlayerWidget,
         cacheConfig: TestUtils.testCacheConfig,
       );
 
@@ -388,7 +396,7 @@ void main() {
 
       await tester.pumpWidget(
         TestUtils.createTestAppWithCache(
-          child: const VideoPlayerWidget(
+          child: const SmartVideoPlayerWidget(
             videoSource: TestUtils.testVideoUrl,
             width: 400,
             height: 300,
@@ -398,7 +406,7 @@ void main() {
         ),
       );
 
-      expect(find.byType(VideoPlayerWidget), findsOneWidget);
+      expect(find.byType(SmartVideoPlayerWidget), findsOneWidget);
       expect(find.byType(CacheConfigScope), findsOneWidget);
     });
 
@@ -413,12 +421,12 @@ void main() {
       for (final ratio in aspectRatios) {
         await TestUtils.testWidgetCreation(
           tester: tester,
-          widget: VideoPlayerWidget(
+          widget: SmartVideoPlayerWidget(
             videoSource: TestUtils.testVideoUrl,
             width: ratio['width']!.toDouble(),
             height: ratio['height']!.toDouble(),
           ),
-          expectedType: VideoPlayerWidget,
+          expectedType: SmartVideoPlayerWidget,
         );
       }
     });

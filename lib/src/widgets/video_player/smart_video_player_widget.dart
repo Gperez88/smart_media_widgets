@@ -6,13 +6,13 @@ import 'package:video_player/video_player.dart';
 
 import '../../utils/cache_manager.dart';
 import '../../utils/media_utils.dart';
-import 'video_content.dart';
-import 'video_error.dart';
-import 'video_loading.dart';
-import 'video_placeholder.dart';
+import 'smart_video_content.dart';
+import 'smart_video_error.dart';
+import 'smart_video_loading.dart';
+import 'smart_video_placeholder.dart';
 
 /// A smart widget for displaying videos with preloading and error handling
-class VideoPlayerWidget extends StatefulWidget {
+class SmartVideoPlayerWidget extends StatefulWidget {
   /// The video source (URL or local file path)
   final String videoSource;
 
@@ -73,7 +73,7 @@ class VideoPlayerWidget extends StatefulWidget {
   /// Callback when video ends
   final VoidCallback? onVideoEnd;
 
-  const VideoPlayerWidget({
+  const SmartVideoPlayerWidget({
     super.key,
     required this.videoSource,
     this.width,
@@ -98,10 +98,10 @@ class VideoPlayerWidget extends StatefulWidget {
   });
 
   @override
-  State<VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
+  State<SmartVideoPlayerWidget> createState() => _VideoPlayerWidgetState();
 }
 
-class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
+class _VideoPlayerWidgetState extends State<SmartVideoPlayerWidget> {
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
   bool _isLoading = true;
@@ -117,7 +117,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
   }
 
   @override
-  void didUpdateWidget(VideoPlayerWidget oldWidget) {
+  void didUpdateWidget(SmartVideoPlayerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     // If cache config changed, update it

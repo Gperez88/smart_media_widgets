@@ -11,12 +11,12 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
           width: 200,
           height: 300,
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
     });
 
@@ -25,51 +25,51 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: TestUtils.testLocalImagePath,
           width: 200,
           height: 300,
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
     });
 
     testWidgets('creates with custom fit', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
           width: 200,
           height: 300,
           fit: BoxFit.contain,
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
     });
 
     testWidgets('creates with border radius', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
           width: 200,
           height: 300,
           borderRadius: BorderRadius.all(Radius.circular(10)),
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
     });
 
     testWidgets('creates with custom placeholder', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
           width: 300,
           height: 200,
           placeholder: Center(child: CircularProgressIndicator()),
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
     });
 
@@ -78,27 +78,27 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: 'https://invalid-url-that-will-fail.com/image.jpg',
           width: 300,
           height: 200,
           errorWidget: Center(child: Text('Error loading image')),
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
     });
 
     testWidgets('creates with local cache config', (WidgetTester tester) async {
       await TestUtils.testWidgetWithCache(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
           width: 200,
           height: 300,
           localCacheConfig: TestUtils.testCacheConfig,
           useGlobalConfig: false,
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
         cacheConfig: TestUtils.testCacheConfig,
       );
     });
@@ -106,26 +106,26 @@ void main() {
     testWidgets('creates with cache disabled', (WidgetTester tester) async {
       await TestUtils.testWidgetWithCacheDisabled(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
           width: 200,
           height: 300,
           disableCache: true,
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
     });
 
     testWidgets('creates with preload disabled', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
           width: 200,
           height: 300,
           preload: false,
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
     });
 
@@ -134,13 +134,13 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
           width: 200,
           height: 300,
           loadingColor: Colors.red,
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
     });
 
@@ -149,13 +149,13 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
           width: 200,
           height: 300,
           showLoadingIndicator: false,
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
     });
 
@@ -164,7 +164,7 @@ void main() {
 
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: ImageDisplayWidget(
+        widget: SmartImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
           width: 200,
           height: 300,
@@ -172,7 +172,7 @@ void main() {
             callbackCalled = true;
           },
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
 
       // Note: In a real test environment, you would wait for the image to load
@@ -185,7 +185,7 @@ void main() {
 
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: ImageDisplayWidget(
+        widget: SmartImageDisplayWidget(
           imageSource: 'https://invalid-url-that-will-fail.com/image.jpg',
           width: 200,
           height: 300,
@@ -193,7 +193,7 @@ void main() {
             errorMessage = error;
           },
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
 
       // Note: In a real test environment, you would wait for the error to occur
@@ -212,8 +212,12 @@ void main() {
       for (final url in imageUrls) {
         await TestUtils.testWidgetCreation(
           tester: tester,
-          widget: ImageDisplayWidget(imageSource: url, width: 200, height: 300),
-          expectedType: ImageDisplayWidget,
+          widget: SmartImageDisplayWidget(
+            imageSource: url,
+            width: 200,
+            height: 300,
+          ),
+          expectedType: SmartImageDisplayWidget,
         );
       }
     });
@@ -228,12 +232,12 @@ void main() {
       for (final path in localPaths) {
         await TestUtils.testWidgetCreation(
           tester: tester,
-          widget: ImageDisplayWidget(
+          widget: SmartImageDisplayWidget(
             imageSource: path,
             width: 200,
             height: 300,
           ),
-          expectedType: ImageDisplayWidget,
+          expectedType: SmartImageDisplayWidget,
         );
       }
     });
@@ -241,12 +245,12 @@ void main() {
     testWidgets('handles file:// protocol paths', (WidgetTester tester) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: 'file:///path/to/local/image.jpg',
           width: 200,
           height: 300,
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
     });
 
@@ -255,18 +259,18 @@ void main() {
     ) async {
       await TestUtils.testWidgetCreation(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
           width: 200,
           height: 300,
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
       );
 
       // Update the widget with a different image source
       await tester.pumpWidget(
         TestUtils.createTestApp(
-          child: const ImageDisplayWidget(
+          child: const SmartImageDisplayWidget(
             imageSource: 'https://picsum.photos/400/500',
             width: 200,
             height: 300,
@@ -274,7 +278,7 @@ void main() {
         ),
       );
 
-      expect(find.byType(ImageDisplayWidget), findsOneWidget);
+      expect(find.byType(SmartImageDisplayWidget), findsOneWidget);
     });
 
     testWidgets('updates when cache config changes', (
@@ -282,13 +286,13 @@ void main() {
     ) async {
       await TestUtils.testWidgetWithCache(
         tester: tester,
-        widget: const ImageDisplayWidget(
+        widget: const SmartImageDisplayWidget(
           imageSource: TestUtils.testImageUrl,
           width: 200,
           height: 300,
           localCacheConfig: TestUtils.testCacheConfig,
         ),
-        expectedType: ImageDisplayWidget,
+        expectedType: SmartImageDisplayWidget,
         cacheConfig: TestUtils.testCacheConfig,
       );
 
@@ -299,7 +303,7 @@ void main() {
 
       await tester.pumpWidget(
         TestUtils.createTestAppWithCache(
-          child: const ImageDisplayWidget(
+          child: const SmartImageDisplayWidget(
             imageSource: TestUtils.testImageUrl,
             width: 200,
             height: 300,
@@ -309,7 +313,7 @@ void main() {
         ),
       );
 
-      expect(find.byType(ImageDisplayWidget), findsOneWidget);
+      expect(find.byType(SmartImageDisplayWidget), findsOneWidget);
       expect(find.byType(CacheConfigScope), findsOneWidget);
     });
   });

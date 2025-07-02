@@ -466,23 +466,56 @@ class CacheManager {
 
   /// Downloads and caches an audio file from a remote URL. Returns the local path if successful, or null if failed.
   static Future<String?> cacheAudio(String audioUrl) async {
+    // Check if we can start a new download
+    if (_concurrentAudioDownloads >= _maxConcurrentAudioDownloads) {
+      // Too many concurrent downloads, skip this one
+      return null;
+    }
+
+    _concurrentAudioDownloads++;
+
     try {
       final audioCacheDir = await getAudioCacheDirectory();
       final fileName = _generateAudioFileName(audioUrl);
       final audioFile = File('${audioCacheDir.path}/$fileName');
+
       // If already cached, return path
       if (await audioFile.exists()) {
         return audioFile.path;
       }
-      // Download audio
-      final response = await http.get(Uri.parse(audioUrl));
-      if (response.statusCode == 200) {
-        await audioFile.writeAsBytes(response.bodyBytes);
-        return audioFile.path;
+
+      // Download audio using streaming to avoid memory issues
+      final client = http.Client();
+      try {
+        final request = http.Request('GET', Uri.parse(audioUrl));
+        final response = await client.send(request);
+
+        if (response.statusCode == 200) {
+          // Create file and write stream to avoid loading entire file in memory
+          final sink = audioFile.openWrite();
+          try {
+            await for (final chunk in response.stream) {
+              sink.add(chunk);
+            }
+            await sink.close();
+            return audioFile.path;
+          } catch (e) {
+            await sink.close();
+            // Clean up partial file if write failed
+            if (await audioFile.exists()) {
+              await audioFile.delete();
+            }
+            rethrow;
+          }
+        }
+        return null;
+      } finally {
+        client.close();
       }
-      return null;
     } catch (e) {
       return null;
+    } finally {
+      _concurrentAudioDownloads--;
     }
   }
 
@@ -529,6 +562,14 @@ class CacheManager {
 
   /// Descarga y almacena un video en caché
   static Future<String?> cacheVideo(String videoUrl) async {
+    // Check if we can start a new download
+    if (_concurrentVideoDownloads >= _maxConcurrentVideoDownloads) {
+      // Too many concurrent downloads, skip this one
+      return null;
+    }
+
+    _concurrentVideoDownloads++;
+
     try {
       final videoCacheDir = await getVideoCacheDirectory();
       final fileName = _generateVideoFileName(videoUrl);
@@ -539,15 +580,38 @@ class CacheManager {
         return videoFile.path;
       }
 
-      // Descargar video
-      final response = await http.get(Uri.parse(videoUrl));
-      if (response.statusCode == 200) {
-        await videoFile.writeAsBytes(response.bodyBytes);
-        return videoFile.path;
+      // Descargar video usando streaming para evitar problemas de memoria
+      final client = http.Client();
+      try {
+        final request = http.Request('GET', Uri.parse(videoUrl));
+        final response = await client.send(request);
+
+        if (response.statusCode == 200) {
+          // Crear archivo y escribir stream para evitar cargar todo el archivo en memoria
+          final sink = videoFile.openWrite();
+          try {
+            await for (final chunk in response.stream) {
+              sink.add(chunk);
+            }
+            await sink.close();
+            return videoFile.path;
+          } catch (e) {
+            await sink.close();
+            // Limpiar archivo parcial si la escritura falló
+            if (await videoFile.exists()) {
+              await videoFile.delete();
+            }
+            rethrow;
+          }
+        }
+        return null;
+      } finally {
+        client.close();
       }
-      return null;
     } catch (e) {
       return null;
+    } finally {
+      _concurrentVideoDownloads--;
     }
   }
 
@@ -858,3 +922,11 @@ class CacheManager {
     };
   }
 }
+
+/// Counter to limit concurrent audio downloads
+int _concurrentAudioDownloads = 0;
+final int _maxConcurrentAudioDownloads = 3; // Max 3 concurrent downloads
+
+/// Counter to limit concurrent video downloads
+int _concurrentVideoDownloads = 0;
+final int _maxConcurrentVideoDownloads = 2; // Max 2 concurrent downloads

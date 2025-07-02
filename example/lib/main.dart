@@ -61,7 +61,7 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Column(
         children: [
           // Global Audio Player Overlay - appears when global audio is playing
-          const GlobalAudioPlayerOverlay(
+          const SmartGlobalAudioPlayerOverlay(
             backgroundColor: Color(0xFF4A4A4A), // Dark gray like WhatsApp
             showCloseButton: true,
             closeIcon: Icons.close,

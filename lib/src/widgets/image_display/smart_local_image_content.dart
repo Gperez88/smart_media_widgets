@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'image_error.dart';
+import 'smart_image_error.dart';
 
 class LocalImageContent extends StatelessWidget {
   final String imagePath;

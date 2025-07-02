@@ -2,11 +2,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_media_widgets/smart_media_widgets.dart';
 
-import 'local_image_content.dart';
-import 'remote_image_content.dart';
+import 'smart_local_image_content.dart';
+import 'smart_remote_image_content.dart';
 
 /// A smart widget for displaying images with preloading and error handling
-class ImageDisplayWidget extends StatefulWidget {
+class SmartImageDisplayWidget extends StatefulWidget {
   /// The image source (URL or local file path)
   final String imageSource;
 
@@ -52,7 +52,7 @@ class ImageDisplayWidget extends StatefulWidget {
   /// Callback when image fails to load
   final Function(String error)? onImageError;
 
-  const ImageDisplayWidget({
+  const SmartImageDisplayWidget({
     super.key,
     required this.imageSource,
     this.width,
@@ -72,10 +72,10 @@ class ImageDisplayWidget extends StatefulWidget {
   });
 
   @override
-  State<ImageDisplayWidget> createState() => _ImageDisplayWidgetState();
+  State<SmartImageDisplayWidget> createState() => _ImageDisplayWidgetState();
 }
 
-class _ImageDisplayWidgetState extends State<ImageDisplayWidget> {
+class _ImageDisplayWidgetState extends State<SmartImageDisplayWidget> {
   Function()? _restoreConfig;
 
   @override
@@ -88,7 +88,7 @@ class _ImageDisplayWidgetState extends State<ImageDisplayWidget> {
   }
 
   @override
-  void didUpdateWidget(ImageDisplayWidget oldWidget) {
+  void didUpdateWidget(SmartImageDisplayWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     // If cache config changed, update it

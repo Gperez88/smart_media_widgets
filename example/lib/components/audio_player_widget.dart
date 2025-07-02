@@ -42,11 +42,11 @@ class AudioPlayerWidgetExample extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          
-          // Global Player 1
+
+          // Global Player 1 con leftWidget (avatar)
           Padding(
             padding: const EdgeInsets.only(bottom: 20),
-            child: AudioPlayerWidget(
+            child: SmartAudioPlayerWidget(
               audioSource: _remoteAudios[0],
               width: double.infinity,
               height: 100,
@@ -65,13 +65,20 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               showDuration: true,
               showPosition: true,
               useBubbleStyle: true,
+              // Ejemplo: avatar circular a la izquierda
+              leftWidget: CircleAvatar(
+                radius: 28,
+                backgroundImage: NetworkImage(
+                  'https://randomuser.me/api/portraits/men/32.jpg',
+                ),
+              ),
             ),
           ),
 
-          // Global Player 2
+          // Global Player 2 con rightWidget (icono de micrófono)
           Padding(
             padding: const EdgeInsets.only(bottom: 20),
-            child: AudioPlayerWidget(
+            child: SmartAudioPlayerWidget(
               audioSource: _remoteAudios[1],
               width: double.infinity,
               height: 100,
@@ -90,6 +97,13 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               showDuration: true,
               showPosition: true,
               useBubbleStyle: true,
+              // Ejemplo: icono de micrófono a la derecha
+              rightWidget: CircleAvatar(
+                radius: 28,
+                backgroundImage: NetworkImage(
+                  'https://randomuser.me/api/portraits/men/32.jpg',
+                ),
+              ),
             ),
           ),
 
@@ -114,11 +128,11 @@ class AudioPlayerWidgetExample extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // Local Player
           Padding(
             padding: const EdgeInsets.only(bottom: 20),
-            child: AudioPlayerWidget(
+            child: SmartAudioPlayerWidget(
               audioSource: _remoteAudios[2],
               width: double.infinity,
               height: 100,

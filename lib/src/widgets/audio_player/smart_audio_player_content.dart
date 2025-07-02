@@ -1,8 +1,8 @@
 import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:flutter/material.dart';
 
-import 'audio_play_pause_button.dart';
-import 'audio_waveform_section.dart';
+import 'smart_audio_play_pause_button.dart';
+import 'smart_audio_waveform_section.dart';
 
 class AudioPlayerContent extends StatelessWidget {
   final double? width;
@@ -28,6 +28,8 @@ class AudioPlayerContent extends StatelessWidget {
   final bool showPosition;
   final TextStyle? timeTextStyle;
   final VoidCallback onTogglePlayPause;
+  final Widget? leftWidget;
+  final Widget? rightWidget;
 
   const AudioPlayerContent({
     super.key,
@@ -54,6 +56,8 @@ class AudioPlayerContent extends StatelessWidget {
     required this.showPosition,
     this.timeTextStyle,
     required this.onTogglePlayPause,
+    this.leftWidget,
+    this.rightWidget,
   });
 
   @override
@@ -88,6 +92,10 @@ class AudioPlayerContent extends StatelessWidget {
                 padding: effectivePadding,
                 child: Row(
                   children: [
+                    if (leftWidget != null) ...[
+                      leftWidget!,
+                      const SizedBox(width: 8),
+                    ],
                     AudioPlayPauseButton(
                       isPlaying: isPlaying,
                       playIcon: playIcon,
@@ -113,6 +121,10 @@ class AudioPlayerContent extends StatelessWidget {
                         timeTextStyle: timeTextStyle,
                       ),
                     ),
+                    if (rightWidget != null) ...[
+                      const SizedBox(width: 8),
+                      rightWidget!,
+                    ],
                   ],
                 ),
               ),

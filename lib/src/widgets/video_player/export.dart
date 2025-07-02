@@ -1,1 +1,1 @@
-export 'video_player_widget.dart';
+export 'smart_video_player_widget.dart';
