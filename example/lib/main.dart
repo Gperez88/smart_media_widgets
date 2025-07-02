@@ -58,13 +58,29 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Smart Media Widgets Example'),
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
+      body: Column(
         children: [
-          const ImageDisplayWidgetExample(),
-          const VideoDisplayWidgetExample(),
-          const AudioPlayerWidgetExample(),
-          const CacheConfigWidget(),
+          // Global Audio Player Overlay - appears when global audio is playing
+          const GlobalAudioPlayerOverlay(
+            height: 48,
+            backgroundColor: Color(0xFF4A4A4A), // Dark gray like WhatsApp
+            showCloseButton: true,
+            closeIcon: Icons.close,
+            showSpeedButton: true,
+          ),
+          
+          // Main content
+          Expanded(
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: [
+                const ImageDisplayWidgetExample(),
+                const VideoDisplayWidgetExample(),
+                const AudioPlayerWidgetExample(),
+                const CacheConfigWidget(),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(

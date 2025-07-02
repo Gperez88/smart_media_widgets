@@ -23,157 +23,154 @@ class AudioPlayerWidgetExample extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Basic remote audio examples
+          // Global Player Examples
           const Text(
-            'Remote Audio Players',
+            'Global Audio Players (WhatsApp Style)',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.purple.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
+            ),
+            child: const Text(
+              'Estos reproductores usan el modo global. Al reproducir aparecerá un reproductor persistente arriba.',
+              style: TextStyle(fontSize: 12, color: Colors.purple),
+            ),
+          ),
           const SizedBox(height: 12),
-          ..._remoteAudios.map(
-            (url) => Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: AudioPlayerWidget(
-                audioSource: url,
-                width: double.infinity,
-                height: 100,
-                color: Colors.blueAccent,
-                playIcon: Icons.play_arrow_rounded,
-                pauseIcon: Icons.pause_rounded,
-                borderRadius: BorderRadius.circular(20),
-                onAudioLoaded: () => debugPrint('Remote audio loaded!'),
-                onAudioError: (err) => debugPrint('Remote audio error: $err'),
-                localCacheConfig: const CacheConfig(
-                  maxAudioCacheSize: 30 * 1024 * 1024,
-                ),
-                showLoadingIndicator: true,
-                showSeekLine: true,
-                showDuration: true,
-                showPosition: true,
-                useBubbleStyle: true,
+          
+          // Global Player 1
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: AudioPlayerWidget(
+              audioSource: _remoteAudios[0],
+              width: double.infinity,
+              height: 100,
+              color: Colors.blueAccent,
+              playIcon: Icons.play_arrow_rounded,
+              pauseIcon: Icons.pause_rounded,
+              borderRadius: BorderRadius.circular(20),
+              enableGlobalPlayer: true, // 🎯 Global mode enabled
+              onAudioLoaded: () => debugPrint('Global audio 1 loaded!'),
+              onAudioError: (err) => debugPrint('Global audio 1 error: $err'),
+              localCacheConfig: const CacheConfig(
+                maxAudioCacheSize: 30 * 1024 * 1024,
               ),
+              showLoadingIndicator: true,
+              showSeekLine: true,
+              showDuration: true,
+              showPosition: true,
+              useBubbleStyle: true,
+            ),
+          ),
+
+          // Global Player 2
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: AudioPlayerWidget(
+              audioSource: _remoteAudios[1],
+              width: double.infinity,
+              height: 100,
+              color: Colors.green,
+              playIcon: Icons.play_arrow_rounded,
+              pauseIcon: Icons.pause_rounded,
+              borderRadius: BorderRadius.circular(20),
+              enableGlobalPlayer: true, // 🎯 Global mode enabled
+              onAudioLoaded: () => debugPrint('Global audio 2 loaded!'),
+              onAudioError: (err) => debugPrint('Global audio 2 error: $err'),
+              localCacheConfig: const CacheConfig(
+                maxAudioCacheSize: 30 * 1024 * 1024,
+              ),
+              showLoadingIndicator: true,
+              showSeekLine: true,
+              showDuration: true,
+              showPosition: true,
+              useBubbleStyle: true,
             ),
           ),
 
           const SizedBox(height: 24),
 
-          // Custom styled audio player
+          // Local Player Example
           const Text(
-            'Custom Styled Audio Player',
+            'Local Audio Player (Traditional Mode)',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 12),
-          AudioPlayerWidget(
-            audioSource: _remoteAudios.first,
-            width: double.infinity,
-            height: 120,
-            color: Colors.deepPurple,
-            backgroundColor: Colors.deepPurple.withValues(alpha: 0.9),
-            playIcon: Icons.play_circle_fill,
-            pauseIcon: Icons.pause_circle_filled,
-            borderRadius: BorderRadius.circular(25),
-            onAudioLoaded: () => debugPrint('Custom styled audio loaded!'),
-            onAudioError: (err) =>
-                debugPrint('Custom styled audio error: $err'),
-            showLoadingIndicator: true,
-            showSeekLine: false,
-            showDuration: true,
-            showPosition: true,
-            timeTextStyle: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
             ),
-            useBubbleStyle: true,
-            padding: const EdgeInsets.all(20),
-            margin: const EdgeInsets.symmetric(vertical: 8),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Minimal audio player
-          const Text(
-            'Minimal Audio Player',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            child: const Text(
+              'Este reproductor funciona en modo local tradicional (sin reproductor global).',
+              style: TextStyle(fontSize: 12, color: Colors.orange),
+            ),
           ),
           const SizedBox(height: 12),
-          AudioPlayerWidget(
-            audioSource: _remoteAudios[1],
-            width: double.infinity,
-            height: 80,
-            color: Colors.green,
-            backgroundColor: Colors.green.withValues(alpha: 0.8),
-            borderRadius: BorderRadius.circular(12),
-            onAudioLoaded: () => debugPrint('Minimal audio loaded!'),
-            onAudioError: (err) => debugPrint('Minimal audio error: $err'),
-            showLoadingIndicator: false,
-            showSeekLine: false,
-            showDuration: false,
-            showPosition: false,
-            useBubbleStyle: false,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          
+          // Local Player
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: AudioPlayerWidget(
+              audioSource: _remoteAudios[2],
+              width: double.infinity,
+              height: 100,
+              color: Colors.orange,
+              playIcon: Icons.play_arrow_rounded,
+              pauseIcon: Icons.pause_rounded,
+              borderRadius: BorderRadius.circular(20),
+              enableGlobalPlayer: false, // 🎯 Local mode (traditional)
+              onAudioLoaded: () => debugPrint('Local audio loaded!'),
+              onAudioError: (err) => debugPrint('Local audio error: $err'),
+              localCacheConfig: const CacheConfig(
+                maxAudioCacheSize: 30 * 1024 * 1024,
+              ),
+              showLoadingIndicator: true,
+              showSeekLine: true,
+              showDuration: true,
+              showPosition: true,
+              useBubbleStyle: true,
+            ),
           ),
 
           const SizedBox(height: 24),
 
-          // Note about local audio
+          // Instructions
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.1),
+              color: Colors.blue.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+              border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
             ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '📝 Note: Local Audio Testing',
+                  '🎯 Instrucciones de Prueba',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Colors.orange,
+                    color: Colors.blue,
                   ),
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'To test with local audio files, place an audio file in your assets folder and update the path in the code. The AudioPlayerWidget supports both local and remote audio sources with full caching capabilities.',
+                  '1. Reproduce uno de los audios globales (azul o verde) - aparecerá el reproductor global arriba\n'
+                  '2. Navega entre tabs para ver que el reproductor global persiste\n'
+                  '3. Controla el audio desde cualquier reproductor (local o global)\n'
+                  '4. Prueba el reproductor local (naranja) - funciona independientemente',
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
             ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Example with cache configuration
-          AudioPlayerWidget(
-            audioSource:
-                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-            width: 300,
-            height: 100,
-            color: Colors.teal,
-            localCacheConfig: const CacheConfig(
-              maxAudioCacheSize: 50 * 1024 * 1024, // 50MB
-              enableAutoCleanup: true,
-              cleanupThreshold: 0.7,
-            ),
-            onAudioLoaded: () => debugPrint('Cached audio loaded successfully'),
-            onAudioError: (err) => debugPrint('Cached audio error: $err'),
-          ),
-          const SizedBox(height: 20),
-
-          // Example with error recovery demonstration
-          AudioPlayerWidget(
-            audioSource:
-                'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
-            width: 300,
-            height: 100,
-            color: Colors.orange,
-            onAudioLoaded: () => debugPrint('Audio with error recovery loaded'),
-            onAudioError: (err) {
-              debugPrint('Audio error (will attempt recovery): $err');
-              // The widget will automatically attempt to recover from cache-related errors
-            },
           ),
         ],
       ),
