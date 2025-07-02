@@ -157,6 +157,7 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
   // Global player state
   bool _isPlayingGlobally = false;
   StreamSubscription? _globalPlayerSubscription;
+  int? _lastSyncTime;
 
   @override
   void initState() {
@@ -200,12 +201,46 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
             _isPlaying = state?.isPlaying ?? false;
             _position = state?.position ?? Duration.zero;
             _duration = state?.duration ?? Duration.zero;
+            
+            // Sync local PlayerController position for waveform display
+            if (state != null && state.position != _position) {
+              debugPrint('AudioPlayerWidget: Global position update: ${state.position.inSeconds}s');
+            }
+            _syncLocalPlayerWithGlobalPosition(state?.position ?? Duration.zero);
           } else {
             _isPlaying = false;
           }
         });
       }
     });
+  }
+
+  /// Sync local PlayerController position with global player for waveform display
+  void _syncLocalPlayerWithGlobalPosition(Duration globalPosition) async {
+    // For global mode, we need to sync the PlayerController for waveform visual progress
+    // The AudioFileWaveforms widget uses the PlayerController directly for progress indication
+    if (widget.enableGlobalPlayer && !_isLoading && !_hasError && mounted) {
+      try {
+        // Throttle updates to avoid constant seeking (only every 500ms)
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (_lastSyncTime != null && (now - _lastSyncTime!) < 500) {
+          return;
+        }
+        _lastSyncTime = now;
+        
+        // Ensure local player is paused to avoid audio output
+        if (_playerController.playerState.isPlaying) {
+          await _playerController.pausePlayer();
+        }
+        
+        // Seek to global position for waveform sync
+        await _playerController.seekTo(globalPosition.inMilliseconds);
+        
+      } catch (e) {
+        // Ignore sync errors to avoid breaking the player
+        debugPrint('AudioPlayerWidget: Error syncing waveform position: $e');
+      }
+    }
   }
 
   /// Initialize widget animations
@@ -243,7 +278,11 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget>
     ) {
       if (mounted) {
         setState(() {
-          _position = Duration(milliseconds: duration);
+          // Only update position from local player if NOT in global mode
+          // In global mode, position comes from GlobalAudioPlayerManager
+          if (!widget.enableGlobalPlayer || !_isPlayingGlobally) {
+            _position = Duration(milliseconds: duration);
+          }
         });
       }
     });

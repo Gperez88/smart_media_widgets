@@ -29,15 +29,20 @@ class GlobalAudioPlayerOverlay extends StatefulWidget {
   /// Whether to show playback speed button
   final bool showSpeedButton;
 
+  /// Custom subtitle text to display above the time information.
+  /// If null, defaults to "You yesterday at [current time]"
+  final String? subtitleText;
+
   const GlobalAudioPlayerOverlay({
     super.key,
-    this.height = 48,
+    this.height = 56,
     this.backgroundColor,
     this.borderRadius,
     this.showCloseButton = true,
     this.closeIcon = Icons.close,
     this.animationDuration = const Duration(milliseconds: 300),
     this.showSpeedButton = true,
+    this.subtitleText,
   });
 
   @override
@@ -160,7 +165,7 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'You yesterday at ${_formatTime()}',
+            widget.subtitleText ?? 'Subtitle',
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 13,
@@ -187,16 +192,6 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
         ],
       ),
     );
-  }
-
-  /// Format current time
-  String _formatTime() {
-    final now = DateTime.now();
-    final hour = now.hour;
-    final minute = now.minute.toString().padLeft(2, '0');
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    return '$displayHour:$minute $period';
   }
 
   /// Format duration
