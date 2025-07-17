@@ -94,12 +94,27 @@ class GlobalAudioPlayerManager {
       'GlobalAudioPlayerManager: prepareAudio called - audioSource: $audioSource, playerId: $playerId',
     );
 
-    // Si ya existe este audio, no hacer nada
+    // Si ya existe este audio, verificar si está listo
     if (_activeAudios.containsKey(playerId)) {
       log(
         'GlobalAudioPlayerManager: Audio already exists for playerId: $playerId',
       );
-      return;
+
+      final existingAudio = _activeAudios[playerId]!;
+
+      // Si el audio source es diferente, reemplazar el audio existente
+      if (existingAudio.audioSource != audioSource) {
+        log(
+          'GlobalAudioPlayerManager: Audio source changed, replacing existing audio for playerId: $playerId',
+        );
+        await stop(playerId);
+      } else {
+        // El audio ya existe y tiene la misma fuente, no hacer nada
+        log(
+          'GlobalAudioPlayerManager: Audio already prepared with same source for playerId: $playerId',
+        );
+        return;
+      }
     }
 
     try {
@@ -110,17 +125,37 @@ class GlobalAudioPlayerManager {
       // Crear un nuevo controlador para este audio
       final playerController = PlayerController();
 
-      // Preparar el audio
-      await playerController.preparePlayer(
-        path: audioSource,
-        shouldExtractWaveform: shouldExtractWaveform,
-      );
+      // Preparar el audio con timeout
+      await playerController
+          .preparePlayer(
+            path: audioSource,
+            shouldExtractWaveform: shouldExtractWaveform,
+          )
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw TimeoutException(
+                'Audio preparation timeout',
+                const Duration(seconds: 10),
+              );
+            },
+          );
 
       // Crear notifiers para este audio
       final isPlaying = ValueNotifier<bool>(false);
       final position = ValueNotifier<Duration>(Duration.zero);
       final duration = ValueNotifier<Duration>(const Duration(minutes: 3));
       final waveformData = ValueNotifier<List<double>?>(null);
+
+      // Obtener la duración real del audio
+      try {
+        final actualDuration = await playerController.getDuration();
+        if (actualDuration != null) {
+          duration.value = Duration(milliseconds: actualDuration);
+        }
+      } catch (e) {
+        log('GlobalAudioPlayerManager: Error getting duration: $e');
+      }
 
       // Configurar listeners
       final positionSubscription = playerController.onCurrentDurationChanged
@@ -422,6 +457,15 @@ class GlobalAudioPlayerManager {
     }
   }
 
+  /// Limpia solo los callbacks de un audio sin detenerlo
+  void clearCallbacks(String playerId) {
+    _onPlayCallbacks.remove(playerId);
+    _onPauseCallbacks.remove(playerId);
+    _onStopCallbacks.remove(playerId);
+    _onPositionChangedCallbacks.remove(playerId);
+    _onWaveformDataCallbacks.remove(playerId);
+  }
+
   /// Detiene todos los audios activos
   Future<void> stopAll() async {
     log('GlobalAudioPlayerManager: Stopping all audios');
@@ -439,6 +483,8 @@ class GlobalAudioPlayerManager {
   }
 
   // Métodos de compatibilidad (para no romper código existente)
+  // Estos métodos devuelven valores estáticos para compatibilidad
+  // Para obtener valores dinámicos, usar los métodos específicos del audio activo
   ValueNotifier<bool> get isPlaying => ValueNotifier<bool>(false);
   ValueNotifier<Duration> get position =>
       ValueNotifier<Duration>(Duration.zero);
@@ -456,6 +502,8 @@ class GlobalAudioPlayerManager {
   }
 
   void unregisterPlayer(String playerId) {
-    stop(playerId);
+    // Solo limpiar callbacks, no detener el audio
+    // El audio se mantiene activo para el overlay
+    clearCallbacks(playerId);
   }
 }

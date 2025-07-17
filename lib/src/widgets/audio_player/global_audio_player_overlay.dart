@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'global_audio_player_manager.dart';
@@ -31,12 +32,25 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
   String? _currentPlayerId;
   GlobalAudioInfo? _currentAudioInfo;
 
+  // Control de estado inicial
+  bool _isInitialized = false;
+  StreamSubscription? _activeAudiosSubscription;
+
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _setupListeners();
-    _updateCurrentAudio();
+
+    // Usar un microtask para asegurar que las animaciones estén listas
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+        _updateCurrentAudio();
+      }
+    });
   }
 
   void _initializeAnimations() {
@@ -65,20 +79,24 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
       ),
     );
 
-    // Mostrar animación inicial solo si hay un audio activo y está reproduciéndose
-    if (_currentAudioInfo != null && _currentAudioInfo!.isPlaying.value) {
-      _overlayAnimationController.forward();
-    }
+    // NO mostrar animación inicial aquí - esperar a que esté inicializado
   }
 
   void _setupListeners() {
     // Escuchar cambios en la lista de audios activos
-    GlobalAudioPlayerManager.instance.activeAudiosStream.listen((audios) {
-      _updateCurrentAudio();
-    });
+    _activeAudiosSubscription = GlobalAudioPlayerManager
+        .instance
+        .activeAudiosStream
+        .listen((audios) {
+          if (_isInitialized && mounted) {
+            _updateCurrentAudio();
+          }
+        });
   }
 
   void _updateCurrentAudio() {
+    if (!_isInitialized || !mounted) return;
+
     final audios = GlobalAudioPlayerManager.instance.activeAudios;
 
     // Buscar el primer audio global que esté reproduciéndose
@@ -100,43 +118,51 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
       }
     }
 
-    if (playingAudio != null && playingAudio!.playerId != _currentPlayerId) {
+    final newPlayerId = playingAudio?.playerId;
+    final hasChanged = newPlayerId != _currentPlayerId;
+
+    if (hasChanged) {
+      // Remover listener anterior
+      if (_currentAudioInfo != null) {
+        _currentAudioInfo!.isPlaying.removeListener(_handleStateChange);
+      }
+
       setState(() {
-        _currentPlayerId = playingAudio!.playerId;
+        _currentPlayerId = newPlayerId;
         _currentAudioInfo = playingAudio;
       });
 
       // Configurar listeners para el audio actual
-      _setupAudioListeners();
-    } else if (playingAudio == null && _currentAudioInfo != null) {
-      setState(() {
-        _currentPlayerId = null;
-        _currentAudioInfo = null;
-      });
+      if (_currentAudioInfo != null) {
+        _currentAudioInfo!.isPlaying.addListener(_handleStateChange);
+      }
     }
 
     _handleStateChange();
   }
 
-  void _setupAudioListeners() {
-    if (_currentAudioInfo != null) {
-      _currentAudioInfo!.isPlaying.addListener(_handleStateChange);
-    }
-  }
-
   void _handleStateChange() {
+    if (!_isInitialized || !mounted) return;
+
     final hasAudio = _currentAudioInfo != null;
     final isPlaying = _currentAudioInfo?.isPlaying.value ?? false;
 
+    // Solo mostrar overlay si hay un audio global activo Y está reproduciéndose
+    // Esto evita que aparezca al abrir la app
     if (hasAudio && isPlaying) {
-      _overlayAnimationController.forward();
+      if (_overlayAnimationController.status != AnimationStatus.completed) {
+        _overlayAnimationController.forward();
+      }
     } else {
-      _overlayAnimationController.reverse();
+      if (_overlayAnimationController.status != AnimationStatus.dismissed) {
+        _overlayAnimationController.reverse();
+      }
     }
   }
 
   @override
   void dispose() {
+    _activeAudiosSubscription?.cancel();
     if (_currentAudioInfo != null) {
       _currentAudioInfo!.isPlaying.removeListener(_handleStateChange);
     }
@@ -147,6 +173,11 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
 
   @override
   Widget build(BuildContext context) {
+    // No mostrar nada hasta que esté inicializado
+    if (!_isInitialized) {
+      return const SizedBox.shrink();
+    }
+
     return SlideTransition(
       position: _slideAnimation,
       child: FadeTransition(
@@ -257,9 +288,9 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
                   children: [
                     LinearProgressIndicator(
                       value: progress.clamp(0.0, 1.0),
-                      backgroundColor: Colors.white.withOpacity(0.3),
+                      backgroundColor: Colors.white.withValues(alpha: 0.3),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.white.withOpacity(0.8),
+                        Colors.white.withValues(alpha: 0.8),
                       ),
                       minHeight: 2,
                     ),

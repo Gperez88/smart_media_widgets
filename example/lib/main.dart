@@ -22,7 +22,10 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: Stack(
-        children: [const MyHomePage(), const GlobalAudioPlayerOverlay()],
+        children: [
+          const MyHomePage(),
+          // const GlobalAudioPlayerOverlay(),
+        ],
       ),
     );
   }

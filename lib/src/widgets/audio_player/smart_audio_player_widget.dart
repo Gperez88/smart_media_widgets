@@ -363,22 +363,24 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
         // Si no está activo, preparar el audio
         log('AudioPlayerWidget: Preparing audio in global manager');
         try {
-          // Agregar timeout de 15 segundos para audios remotos
-          await Future.any([
-            manager.prepareAudio(
-              _audioPath!,
-              title: widget.title,
-              playerId: _playerId,
-              isGlobal: widget.enableGlobal,
-              shouldExtractWaveform: false,
-            ),
-            Future.delayed(const Duration(seconds: 15)).then((_) {
-              throw TimeoutException(
-                'Audio preparation timeout',
-                const Duration(seconds: 15),
+          // Usar un timeout más corto para evitar bloqueos
+          await manager
+              .prepareAudio(
+                _audioPath!,
+                title: widget.title,
+                playerId: _playerId,
+                isGlobal: widget.enableGlobal,
+                shouldExtractWaveform: false,
+              )
+              .timeout(
+                const Duration(seconds: 10),
+                onTimeout: () {
+                  throw TimeoutException(
+                    'Audio preparation timeout',
+                    const Duration(seconds: 10),
+                  );
+                },
               );
-            }),
-          ]);
 
           if (_isDisposed) return;
 
@@ -503,10 +505,13 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
       widget.onAudioLoaded?.call();
     } catch (e) {
       if (!_isDisposed) {
-        await _handlePlayerError(e);
+        log('AudioPlayerWidget: Error in _prepareAudio: $e');
+        _handleAudioError(e.toString());
       }
     } finally {
-      _isPreparing = false;
+      if (!_isDisposed) {
+        _isPreparing = false;
+      }
     }
   }
 
@@ -602,8 +607,11 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
       if (widget.enableGlobal) {
         final manager = GlobalAudioPlayerManager.instance;
 
-        // Si este player no es el activo, prepararlo primero
-        if (manager.activePlayerId.value != _playerId) {
+        // Verificar si este audio está activo en el manager
+        final isAudioActive = manager.isAudioActive(_playerId);
+
+        // Si no está activo, prepararlo primero
+        if (!isAudioActive) {
           await _prepareAudio();
           if (_isDisposed) return;
         }
@@ -641,22 +649,8 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
     _durationSubscription?.cancel();
 
     if (widget.enableGlobal) {
-      // Eliminar callbacks del manager global
-      GlobalAudioPlayerManager.instance.unregisterCallbacks(
-        playerId: _playerId,
-        onPlay: () {
-          if (mounted) setState(() => _isPlaying = true);
-        },
-        onPause: () {
-          if (mounted) setState(() => _isPlaying = false);
-        },
-        onStop: () {
-          if (mounted) setState(() => _isPlaying = false);
-        },
-        onPositionChanged: (position) {
-          if (mounted) setState(() => _position = position);
-        },
-      );
+      // Usar unregisterPlayer que solo limpia callbacks sin detener el audio
+      GlobalAudioPlayerManager.instance.unregisterPlayer(_playerId);
     } else {
       // Limpiar recursos del reproductor local
       if (_playerController != null) {
