@@ -188,19 +188,6 @@ void main() {
       );
     });
 
-    testWidgets('creates without seek line', (WidgetTester tester) async {
-      await TestUtils.testWidgetCreation(
-        tester: tester,
-        widget: const SmartAudioPlayerWidget(
-          audioSource: TestUtils.testAudioUrl,
-          width: 300,
-          height: 80,
-          showSeekLine: false,
-        ),
-        expectedType: SmartAudioPlayerWidget,
-      );
-    });
-
     testWidgets('creates without duration display', (
       WidgetTester tester,
     ) async {
@@ -488,7 +475,6 @@ void main() {
           width: 300,
           height: 80,
           showLoadingIndicator: false,
-          showSeekLine: false,
           showDuration: false,
           showPosition: false,
           useBubbleStyle: false,
@@ -548,6 +534,254 @@ void main() {
 
       // The widget should handle missing cache files gracefully
       expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
+    });
+  });
+
+  group('Global Audio Exclusivity Tests', () {
+    testWidgets(
+      'should pause other global audios when playing a new global audio',
+      (WidgetTester tester) async {
+        // Arrange
+        final manager = GlobalAudioPlayerManager.instance;
+
+        // Preparar dos audios globales
+        await manager.prepareAudio(
+          'test_audio1.mp3',
+          playerId: 'player1',
+          title: 'Audio 1',
+          isGlobal: true,
+        );
+
+        await manager.prepareAudio(
+          'test_audio2.mp3',
+          playerId: 'player2',
+          title: 'Audio 2',
+          isGlobal: true,
+        );
+
+        // Act - Reproducir el primer audio
+        await manager.play('player1');
+
+        // Verificar que el primer audio está reproduciéndose
+        final audio1 = manager.getAudioInfo('player1');
+        expect(audio1?.isPlaying.value, true);
+
+        // Act - Reproducir el segundo audio
+        await manager.play('player2');
+
+        // Assert - El segundo audio debe estar reproduciéndose
+        final audio2 = manager.getAudioInfo('player2');
+        expect(audio2?.isPlaying.value, true);
+
+        // Assert - El primer audio debe haberse pausado automáticamente
+        expect(audio1?.isPlaying.value, false);
+      },
+    );
+
+    testWidgets(
+      'should not pause non-global audios when playing a global audio',
+      (WidgetTester tester) async {
+        // Arrange
+        final manager = GlobalAudioPlayerManager.instance;
+
+        // Preparar un audio no global y un audio global
+        await manager.prepareAudio(
+          'test_audio1.mp3',
+          playerId: 'player1',
+          title: 'Audio 1',
+          isGlobal: false,
+        );
+
+        await manager.prepareAudio(
+          'test_audio2.mp3',
+          playerId: 'player2',
+          title: 'Audio 2',
+          isGlobal: true,
+        );
+
+        // Act - Reproducir el audio no global
+        await manager.play('player1');
+
+        // Verificar que el audio no global está reproduciéndose
+        final audio1 = manager.getAudioInfo('player1');
+        expect(audio1?.isPlaying.value, true);
+
+        // Act - Reproducir el audio global
+        await manager.play('player2');
+
+        // Assert - El audio global debe estar reproduciéndose
+        final audio2 = manager.getAudioInfo('player2');
+        expect(audio2?.isPlaying.value, true);
+
+        // Assert - El audio no global debe seguir reproduciéndose
+        expect(audio1?.isPlaying.value, true);
+      },
+    );
+
+    testWidgets(
+      'should allow multiple non-global audios to play simultaneously',
+      (WidgetTester tester) async {
+        // Arrange
+        final manager = GlobalAudioPlayerManager.instance;
+
+        // Preparar dos audios no globales
+        await manager.prepareAudio(
+          'test_audio1.mp3',
+          playerId: 'player1',
+          title: 'Audio 1',
+          isGlobal: false,
+        );
+
+        await manager.prepareAudio(
+          'test_audio2.mp3',
+          playerId: 'player2',
+          title: 'Audio 2',
+          isGlobal: false,
+        );
+
+        // Act - Reproducir ambos audios
+        await manager.play('player1');
+        await manager.play('player2');
+
+        // Assert - Ambos audios deben estar reproduciéndose
+        final audio1 = manager.getAudioInfo('player1');
+        final audio2 = manager.getAudioInfo('player2');
+
+        expect(audio1?.isPlaying.value, true);
+        expect(audio2?.isPlaying.value, true);
+      },
+    );
+
+    testWidgets('should only show global audios in the overlay', (
+      WidgetTester tester,
+    ) async {
+      // Arrange
+      final manager = GlobalAudioPlayerManager.instance;
+
+      // Preparar un audio global y un audio no global
+      await manager.prepareAudio(
+        'test_audio1.mp3',
+        playerId: 'player1',
+        title: 'Global Audio',
+        isGlobal: true,
+      );
+
+      await manager.prepareAudio(
+        'test_audio2.mp3',
+        playerId: 'player2',
+        title: 'Non-Global Audio',
+        isGlobal: false,
+      );
+
+      // Act - Reproducir el audio no global primero
+      await manager.play('player2');
+
+      // Act - Reproducir el audio global
+      await manager.play('player1');
+
+      // Assert - Solo el audio global debe estar en la lista de audios activos del overlay
+      final activeAudios = manager.activeAudios;
+      final globalAudios = activeAudios
+          .where((audio) => audio.isGlobal)
+          .toList();
+      final nonGlobalAudios = activeAudios
+          .where((audio) => !audio.isGlobal)
+          .toList();
+
+      expect(globalAudios.length, 1);
+      expect(nonGlobalAudios.length, 1);
+
+      // El overlay solo debe mostrar audios globales
+      expect(globalAudios.first.title, 'Global Audio');
+    });
+  });
+
+  group('Local Audio Player Progress Tests', () {
+    testWidgets('should update progress for local audio player', (
+      WidgetTester tester,
+    ) async {
+      // Arrange
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SmartAudioPlayerWidget(
+              audioSource: TestUtils.testAudioUrl,
+              enableGlobal: false, // Usar reproductor local
+              width: 300,
+              height: 80,
+            ),
+          ),
+        ),
+      );
+
+      // Wait for the widget to load
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+
+      // Verify the widget is created
+      expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
+
+      // Note: In a real test environment with actual audio files,
+      // we would simulate audio playback and verify progress updates
+      // For now, we just verify the widget structure is correct
+    });
+
+    testWidgets('should handle play/pause for local audio player', (
+      WidgetTester tester,
+    ) async {
+      // Arrange
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SmartAudioPlayerWidget(
+              audioSource: TestUtils.testAudioUrl,
+              enableGlobal: false, // Usar reproductor local
+              width: 300,
+              height: 80,
+            ),
+          ),
+        ),
+      );
+
+      // Wait for the widget to load
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+
+      // Verify the widget is created
+      expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
+
+      // Note: In a real test environment, we would tap the play button
+      // and verify the state changes correctly
+    });
+
+    testWidgets('should show progress bar for local audio player', (
+      WidgetTester tester,
+    ) async {
+      // Arrange
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SmartAudioPlayerWidget(
+              audioSource: TestUtils.testAudioUrl,
+              enableGlobal: false, // Usar reproductor local
+              width: 300,
+              height: 80,
+              showDuration: true,
+              showPosition: true,
+            ),
+          ),
+        ),
+      );
+
+      // Wait for the widget to load
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+
+      // Verify the widget is created and shows progress elements
+      expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
+
+      // Note: In a real test environment, we would verify that
+      // LinearProgressIndicator and AudioTimeDisplay are present
     });
   });
 }

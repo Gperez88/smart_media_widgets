@@ -1,8 +1,7 @@
-import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:flutter/material.dart';
 
 import 'smart_audio_play_pause_button.dart';
-import 'smart_audio_waveform_section.dart';
+import 'smart_audio_time_display.dart';
 
 class AudioPlayerContent extends StatelessWidget {
   final double? width;
@@ -13,7 +12,6 @@ class AudioPlayerContent extends StatelessWidget {
   final Color color;
   final bool useBubbleStyle;
   final EdgeInsetsGeometry? padding;
-  final PlayerController playerController;
   final bool isPlaying;
   final Duration position;
   final Duration duration;
@@ -22,15 +20,12 @@ class AudioPlayerContent extends StatelessWidget {
   final Duration animationDuration;
   final AnimationController animationController;
   final Animation<double> scaleAnimation;
-  final PlayerWaveStyle? waveStyle;
-  final bool showSeekLine;
   final bool showDuration;
   final bool showPosition;
   final TextStyle? timeTextStyle;
   final VoidCallback onTogglePlayPause;
   final Widget? leftWidget;
   final Widget? rightWidget;
-  final List<double>? waveformData;
 
   const AudioPlayerContent({
     super.key,
@@ -42,7 +37,6 @@ class AudioPlayerContent extends StatelessWidget {
     required this.color,
     required this.useBubbleStyle,
     this.padding,
-    required this.playerController,
     required this.isPlaying,
     required this.position,
     required this.duration,
@@ -51,15 +45,12 @@ class AudioPlayerContent extends StatelessWidget {
     required this.animationDuration,
     required this.animationController,
     required this.scaleAnimation,
-    this.waveStyle,
-    required this.showSeekLine,
     required this.showDuration,
     required this.showPosition,
     this.timeTextStyle,
     required this.onTogglePlayPause,
     this.leftWidget,
     this.rightWidget,
-    this.waveformData,
   });
 
   @override
@@ -109,19 +100,16 @@ class AudioPlayerContent extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: AudioWaveformSection(
-                        playerController: playerController,
-                        width: width,
-                        height: height,
-                        waveStyle: waveStyle,
-                        showSeekLine: showSeekLine,
-                        showDuration: showDuration,
-                        showPosition: showPosition,
-                        isPlaying: isPlaying,
-                        position: position,
-                        duration: duration,
-                        timeTextStyle: timeTextStyle,
-                        waveformData: waveformData,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildProgressSection(),
+                          if (showDuration || showPosition) ...[
+                            const SizedBox(height: 4),
+                            _buildTimeDisplay(),
+                          ],
+                        ],
                       ),
                     ),
                     if (rightWidget != null) ...[
@@ -135,6 +123,41 @@ class AudioPlayerContent extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildProgressSection() {
+    final progress = duration.inMilliseconds > 0
+        ? position.inMilliseconds / duration.inMilliseconds
+        : 0.0;
+
+    // Debug log para verificar los valores
+    debugPrint(
+      'AudioPlayerContent: Position: ${position.inSeconds}s, Duration: ${duration.inSeconds}s, Progress: ${(progress * 100).toStringAsFixed(1)}%',
+    );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        LinearProgressIndicator(
+          value: progress.clamp(0.0, 1.0),
+          backgroundColor: Colors.white.withOpacity(0.3),
+          valueColor: AlwaysStoppedAnimation<Color>(
+            Colors.white.withOpacity(0.8),
+          ),
+          minHeight: 4,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimeDisplay() {
+    return AudioTimeDisplay(
+      isPlaying: isPlaying,
+      position: position,
+      duration: duration,
+      timeTextStyle:
+          timeTextStyle ?? const TextStyle(color: Colors.white70, fontSize: 12),
     );
   }
 }

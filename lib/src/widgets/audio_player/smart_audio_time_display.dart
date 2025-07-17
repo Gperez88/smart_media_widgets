@@ -16,15 +16,16 @@ class AudioTimeDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          isPlaying ? _formatDuration(position) : _formatDuration(duration),
-          style: timeTextStyle ?? _getDefaultTextStyle(),
-        ),
-      ],
+    return Text(
+      _formatTimeDisplay(),
+      style: timeTextStyle ?? _getDefaultTextStyle(),
     );
+  }
+
+  String _formatTimeDisplay() {
+    final positionStr = _formatDuration(position);
+    final durationStr = _formatDuration(duration);
+    return '$positionStr / $durationStr';
   }
 
   String _formatDuration(Duration duration) {

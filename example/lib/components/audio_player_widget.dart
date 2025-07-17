@@ -55,10 +55,11 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               pauseIcon: Icons.pause_rounded,
               borderRadius: BorderRadius.circular(20),
               showLoadingIndicator: true,
-              showSeekLine: true,
               showDuration: true,
               showPosition: true,
               useBubbleStyle: true,
+              enableGlobal: true,
+              title: 'Nombre del audio',
               // Ejemplo: avatar circular a la izquierda
               leftWidget: CircleAvatar(
                 radius: 28,
@@ -81,10 +82,11 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               pauseIcon: Icons.pause_rounded,
               borderRadius: BorderRadius.circular(20),
               showLoadingIndicator: true,
-              showSeekLine: true,
               showDuration: true,
               showPosition: true,
               useBubbleStyle: true,
+              enableGlobal: true,
+              title: 'Mismo audio, diferente instancia',
               // Ejemplo: icono de micrófono a la derecha
               rightWidget: CircleAvatar(
                 radius: 28,
@@ -129,7 +131,6 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               pauseIcon: Icons.pause_rounded,
               borderRadius: BorderRadius.circular(20),
               showLoadingIndicator: true,
-              showSeekLine: true,
               showDuration: true,
               showPosition: true,
               useBubbleStyle: true,
