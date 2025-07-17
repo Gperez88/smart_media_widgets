@@ -54,12 +54,6 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               playIcon: Icons.play_arrow_rounded,
               pauseIcon: Icons.pause_rounded,
               borderRadius: BorderRadius.circular(20),
-              enableGlobalPlayer: true, // 🎯 Global mode enabled
-              onAudioLoaded: () => debugPrint('Global audio 1 loaded!'),
-              onAudioError: (err) => debugPrint('Global audio 1 error: $err'),
-              localCacheConfig: const CacheConfig(
-                maxAudioCacheSize: 30 * 1024 * 1024,
-              ),
               showLoadingIndicator: true,
               showSeekLine: true,
               showDuration: true,
@@ -86,12 +80,6 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               playIcon: Icons.play_arrow_rounded,
               pauseIcon: Icons.pause_rounded,
               borderRadius: BorderRadius.circular(20),
-              enableGlobalPlayer: true, // 🎯 Global mode enabled
-              onAudioLoaded: () => debugPrint('Global audio 2 loaded!'),
-              onAudioError: (err) => debugPrint('Global audio 2 error: $err'),
-              localCacheConfig: const CacheConfig(
-                maxAudioCacheSize: 30 * 1024 * 1024,
-              ),
               showLoadingIndicator: true,
               showSeekLine: true,
               showDuration: true,
@@ -140,12 +128,6 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               playIcon: Icons.play_arrow_rounded,
               pauseIcon: Icons.pause_rounded,
               borderRadius: BorderRadius.circular(20),
-              enableGlobalPlayer: false, // 🎯 Local mode (traditional)
-              onAudioLoaded: () => debugPrint('Local audio loaded!'),
-              onAudioError: (err) => debugPrint('Local audio error: $err'),
-              localCacheConfig: const CacheConfig(
-                maxAudioCacheSize: 30 * 1024 * 1024,
-              ),
               showLoadingIndicator: true,
               showSeekLine: true,
               showDuration: true,

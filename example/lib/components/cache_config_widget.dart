@@ -247,7 +247,7 @@ class _CacheConfigWidgetState extends State<CacheConfigWidget> {
               'Audio Cache Size',
               _currentConfig.maxAudioCacheSize / (50 * 1024 * 1024),
               0.1,
-              2.0,
+              4.0,
               (value) => _updateConfig(
                 maxAudioCacheSize: (value * 50 * 1024 * 1024).round(),
               ),

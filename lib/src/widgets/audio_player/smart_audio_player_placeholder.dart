@@ -31,7 +31,7 @@ class AudioPlayerPlaceholder extends StatelessWidget {
       margin: margin,
       decoration: BoxDecoration(
         borderRadius: borderRadius ?? BorderRadius.circular(16),
-        color: backgroundColor ?? color.withValues(alpha: 0.3),
+        color: backgroundColor ?? color.withOpacity(0.3),
       ),
       child: showLoadingIndicator
           ? Center(child: CircularProgressIndicator(color: color))

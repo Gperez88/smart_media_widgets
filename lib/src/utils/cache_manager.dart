@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:developer';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -245,6 +246,17 @@ class CacheManager {
     }
   }
 
+  /// Clears all cached content (images, videos, and audio)
+  static Future<void> clearAllCache() async {
+    try {
+      await clearImageCache();
+      await clearVideoCache();
+      await clearAudioCache();
+    } catch (e) {
+      // Handle cache clearing errors silently
+    }
+  }
+
   /// Clears cache for a specific image URL
   static Future<void> clearImageCacheForUrl(String imageUrl) async {
     try {
@@ -466,56 +478,76 @@ class CacheManager {
 
   /// Downloads and caches an audio file from a remote URL. Returns the local path if successful, or null if failed.
   static Future<String?> cacheAudio(String audioUrl) async {
-    // Check if we can start a new download
     if (_concurrentAudioDownloads >= _maxConcurrentAudioDownloads) {
-      // Too many concurrent downloads, skip this one
+      log(
+        'CacheManager: Skipping audio download - too many concurrent downloads: $_concurrentAudioDownloads',
+      );
       return null;
     }
 
     _concurrentAudioDownloads++;
+    log(
+      'CacheManager: Starting audio download: $audioUrl (concurrent: $_concurrentAudioDownloads)',
+    );
 
     try {
       final audioCacheDir = await getAudioCacheDirectory();
       final fileName = _generateAudioFileName(audioUrl);
       final audioFile = File('${audioCacheDir.path}/$fileName');
 
-      // If already cached, return path
       if (await audioFile.exists()) {
+        log('CacheManager: Audio already cached: $fileName');
         return audioFile.path;
       }
 
-      // Download audio using streaming to avoid memory issues
       final client = http.Client();
       try {
         final request = http.Request('GET', Uri.parse(audioUrl));
         final response = await client.send(request);
 
         if (response.statusCode == 200) {
-          // Create file and write stream to avoid loading entire file in memory
           final sink = audioFile.openWrite();
           try {
+            int totalBytes = 0;
             await for (final chunk in response.stream) {
               sink.add(chunk);
+              totalBytes += chunk.length;
+
+              if (totalBytes % (1024 * 1024) == 0) {
+                log(
+                  'CacheManager: Downloaded ${totalBytes ~/ (1024 * 1024)}MB for: $fileName',
+                );
+              }
             }
             await sink.close();
+
+            log(
+              'CacheManager: Successfully cached audio: $fileName (${totalBytes ~/ 1024}KB)',
+            );
             return audioFile.path;
           } catch (e) {
             await sink.close();
-            // Clean up partial file if write failed
             if (await audioFile.exists()) {
               await audioFile.delete();
             }
+            log('CacheManager: Error writing audio file: $e');
             rethrow;
           }
+        } else {
+          log('CacheManager: HTTP error ${response.statusCode} for: $audioUrl');
+          return null;
         }
-        return null;
       } finally {
         client.close();
       }
     } catch (e) {
+      log('CacheManager: Error caching audio: $e');
       return null;
     } finally {
       _concurrentAudioDownloads--;
+      log(
+        'CacheManager: Finished audio download: $audioUrl (concurrent: $_concurrentAudioDownloads)',
+      );
     }
   }
 
@@ -560,58 +592,78 @@ class CacheManager {
     }
   }
 
-  /// Descarga y almacena un video en caché
+  /// Downloads and caches a video file from a remote URL. Returns the local path if successful, or null if failed.
   static Future<String?> cacheVideo(String videoUrl) async {
-    // Check if we can start a new download
     if (_concurrentVideoDownloads >= _maxConcurrentVideoDownloads) {
-      // Too many concurrent downloads, skip this one
+      log(
+        'CacheManager: Skipping video download - too many concurrent downloads: $_concurrentVideoDownloads',
+      );
       return null;
     }
 
     _concurrentVideoDownloads++;
+    log(
+      'CacheManager: Starting video download: $videoUrl (concurrent: $_concurrentVideoDownloads)',
+    );
 
     try {
       final videoCacheDir = await getVideoCacheDirectory();
       final fileName = _generateVideoFileName(videoUrl);
       final videoFile = File('${videoCacheDir.path}/$fileName');
 
-      // Si ya está en caché, retornar path
       if (await videoFile.exists()) {
+        log('CacheManager: Video already cached: $fileName');
         return videoFile.path;
       }
 
-      // Descargar video usando streaming para evitar problemas de memoria
       final client = http.Client();
       try {
         final request = http.Request('GET', Uri.parse(videoUrl));
         final response = await client.send(request);
 
         if (response.statusCode == 200) {
-          // Crear archivo y escribir stream para evitar cargar todo el archivo en memoria
           final sink = videoFile.openWrite();
           try {
+            int totalBytes = 0;
             await for (final chunk in response.stream) {
               sink.add(chunk);
+              totalBytes += chunk.length;
+
+              if (totalBytes % (5 * 1024 * 1024) == 0) {
+                log(
+                  'CacheManager: Downloaded ${totalBytes ~/ (1024 * 1024)}MB for: $fileName',
+                );
+              }
             }
             await sink.close();
+
+            log(
+              'CacheManager: Successfully cached video: $fileName (${totalBytes ~/ 1024}MB)',
+            );
             return videoFile.path;
           } catch (e) {
             await sink.close();
-            // Limpiar archivo parcial si la escritura falló
             if (await videoFile.exists()) {
               await videoFile.delete();
             }
+            log('CacheManager: Error writing video file: $e');
             rethrow;
           }
+        } else {
+          log('CacheManager: HTTP error ${response.statusCode} for: $videoUrl');
+          return null;
         }
-        return null;
       } finally {
         client.close();
       }
     } catch (e) {
+      log('CacheManager: Error caching video: $e');
       return null;
     } finally {
       _concurrentVideoDownloads--;
+      log(
+        'CacheManager: Finished video download: $videoUrl (concurrent: $_concurrentVideoDownloads)',
+      );
     }
   }
 
@@ -925,8 +977,8 @@ class CacheManager {
 
 /// Counter to limit concurrent audio downloads
 int _concurrentAudioDownloads = 0;
-final int _maxConcurrentAudioDownloads = 3; // Max 3 concurrent downloads
+const int _maxConcurrentAudioDownloads = 3; // Max 3 concurrent downloads
 
 /// Counter to limit concurrent video downloads
 int _concurrentVideoDownloads = 0;
-final int _maxConcurrentVideoDownloads = 2; // Max 2 concurrent downloads
+const int _maxConcurrentVideoDownloads = 2; // Max 2 concurrent downloads

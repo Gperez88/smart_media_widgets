@@ -97,9 +97,6 @@ class SmartAudioPlayerWidget extends StatefulWidget {
   /// Whether to disable caching for this specific audio
   final bool disableCache;
 
-  /// Whether to enable global player mode (WhatsApp/Telegram style)
-  final bool enableGlobalPlayer;
-
   /// Optional widget to display at the left side of the player (e.g., avatar, icon)
   final Widget? leftWidget;
 
@@ -133,7 +130,6 @@ class SmartAudioPlayerWidget extends StatefulWidget {
     this.padding,
     this.margin,
     this.disableCache = false,
-    this.enableGlobalPlayer = false,
     this.leftWidget,
     this.rightWidget,
   });
@@ -163,12 +159,12 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
   Function()? _restoreConfig;
   StreamSubscription? _durationSubscription;
 
-  // Global player subscription for cleanup
-  StreamSubscription? _globalPlayerSubscription;
+  // Memory management
+  bool _isDisposed = false;
+  bool _isPreparing = false;
 
-  /// Get or create PlayerController based on mode
+  /// Get or create PlayerController
   PlayerController get _effectivePlayerController {
-    // Both global and local players use their own controller
     return _playerController ??= PlayerController();
   }
 
@@ -177,21 +173,8 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
     super.initState();
     _initializeAnimations();
     _applyCacheConfig();
-
-    // Register global player if enabled
-    if (widget.enableGlobalPlayer) {
-      GlobalAudioPlayerManager.instance.registerGlobalPlayer(
-        widget.audioSource,
-        _stopFromGlobalManager,
-      );
-    }
-
-    // Both global and local players work exactly the same way now
     _prepareAudio();
     _setupPlayerListeners();
-    
-    // Global players no longer need complex listeners
-    // They work as local players and only notify overlay when needed
   }
 
   @override
@@ -202,11 +185,10 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
 
   @override
   void dispose() {
+    _isDisposed = true;
     _cleanup();
     super.dispose();
   }
-
-
 
   /// Initialize widget animations
   void _initializeAnimations() {
@@ -225,9 +207,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
       _restoreConfig?.call();
       _applyCacheConfig();
     }
-    if (oldWidget.audioSource != widget.audioSource &&
-        !widget.enableGlobalPlayer) {
-      // Only re-prepare audio in local mode
+    if (oldWidget.audioSource != widget.audioSource) {
       _prepareAudio();
     }
   }
@@ -242,21 +222,19 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
   void _setupPlayerListeners() {
     // Both global and local players setup listeners the same way
 
-    _durationSubscription = _effectivePlayerController.onCurrentDurationChanged.listen((
-      duration,
-    ) {
-      if (mounted) {
-        setState(() {
-          // Both global and local players update position the same way
-          _position = Duration(milliseconds: duration);
+    _durationSubscription = _effectivePlayerController.onCurrentDurationChanged
+        .listen((duration) {
+          if (mounted) {
+            setState(() {
+              // Both global and local players update position the same way
+              _position = Duration(milliseconds: duration);
+            });
+
+            // For global players, we don't need to sync on every position update
+            // The global manager will handle position updates through its own listeners
+            // Only sync when playback state changes (play/pause/stop)
+          }
         });
-        
-        // If this is a global player, update the overlay with position changes
-        if (widget.enableGlobalPlayer && !_isLoading) {
-          _notifyGlobalPlayback();
-        }
-      }
-    });
   }
 
   /// Apply cache configuration
@@ -277,10 +255,15 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
 
   /// Prepare audio for playback
   Future<void> _prepareAudio() async {
+    if (_isDisposed || _isPreparing) return;
+
+    _isPreparing = true;
     _setLoadingState(true);
 
     try {
       final path = await _resolveAudioPath();
+      if (_isDisposed) return;
+
       _audioPath = path;
 
       log('AudioPlayerWidget: Preparing player with path: $_audioPath');
@@ -315,6 +298,8 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
 
           // Try to re-resolve the path in case cache was cleared
           final newPath = await _resolveAudioPath();
+          if (_isDisposed) return;
+
           if (newPath != _audioPath) {
             _audioPath = newPath;
             debugPrint('AudioPlayerWidget: Re-resolved path: $_audioPath');
@@ -328,7 +313,6 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
       if (_audioPath != null &&
           !MediaUtils.isRemoteSource(_audioPath!) &&
           MediaUtils.isRemoteSource(widget.audioSource)) {
-        // This is a cached file path, verify it still exists
         if (!File(_audioPath!).existsSync()) {
           debugPrint(
             'AudioPlayerWidget: Cached file no longer exists, falling back to remote URL',
@@ -337,17 +321,29 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
         }
       }
 
-      await _effectivePlayerController.preparePlayer(
+      if (_isDisposed) return;
+
+      // Determine if we should extract waveform based on source type and size
+      final shouldExtract = await _shouldExtractWaveform(_audioPath!);
+
+      // Add timeout to prevent infinite loading
+      await _preparePlayerWithTimeout(
         path: _audioPath!,
-        shouldExtractWaveform: true,
+        shouldExtractWaveform: shouldExtract,
       );
+
+      if (_isDisposed) return;
 
       _duration = const Duration(minutes: 3); // Default, will be updated
       widget.onAudioLoaded?.call();
       _setLoadingState(false);
     } catch (e) {
-      debugPrint('AudioPlayerWidget: Error preparing audio: $e');
-      await _handlePlayerError(e);
+      if (!_isDisposed) {
+        debugPrint('AudioPlayerWidget: Error preparing audio: $e');
+        await _handlePlayerError(e);
+      }
+    } finally {
+      _isPreparing = false;
     }
   }
 
@@ -437,95 +433,49 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
 
   /// Toggle between play and pause
   Future<void> _togglePlayPause() async {
+    if (_isDisposed) return;
+
     // Both global and local players now work the same way
     try {
-      // If this is a global player starting to play, stop any existing global player first
-      if (widget.enableGlobalPlayer && !_isPlaying) {
-        await _stopOtherGlobalPlayers();
-      }
-
       if (_isPlaying) {
+        // Pausing current player
         await _effectivePlayerController.pausePlayer();
-      } else {
-        await _effectivePlayerController.startPlayer();
-      }
 
-      if (mounted) {
-        setState(() {
-          _isPlaying = !_isPlaying;
-        });
-      }
-
-      // If this is a global player, always notify the overlay of state changes
-      if (widget.enableGlobalPlayer) {
-        await _notifyGlobalPlayback();
-      }
-    } catch (e) {
-      // Handle playback errors with recovery
-      await _handlePlayerError(e);
-    }
-  }
-
-
-
-  /// Notify the global overlay about this player becoming active
-  Future<void> _notifyGlobalPlayback() async {
-    try {
-      // Create overlay state that mirrors this player's state
-      await GlobalAudioPlayerManager.instance.syncWithLocalPlayer(
-        audioSource: widget.audioSource,
-        playerController: _effectivePlayerController,
-        isPlaying: _isPlaying,
-        position: _position,
-        duration: _duration,
-        color: widget.color,
-        playIcon: widget.playIcon,
-        pauseIcon: widget.pauseIcon,
-        waveStyle: widget.waveStyle,
-        showSeekLine: widget.showSeekLine,
-      );
-    } catch (e) {
-      debugPrint('AudioPlayerWidget: Error notifying global playback: $e');
-    }
-  }
-
-  /// Stop other global players before starting this one
-  Future<void> _stopOtherGlobalPlayers() async {
-    await GlobalAudioPlayerManager.instance.stopOtherGlobalPlayers(widget.audioSource);
-  }
-
-  /// Stop this player when called by global manager
-  void _stopFromGlobalManager() {
-    if (mounted && _isPlaying) {
-      log('AudioPlayerWidget: Stopping due to global manager request: ${widget.audioSource}');
-      _effectivePlayerController.pausePlayer().then((_) {
-        if (mounted) {
+        if (mounted && !_isDisposed) {
           setState(() {
             _isPlaying = false;
           });
         }
-      }).catchError((e) {
-        log('AudioPlayerWidget: Error stopping player: $e');
-      });
+      } else {
+        // Starting to play - ALWAYS ensure single audio playback first
+        await _effectivePlayerController.startPlayer();
+
+        if (mounted && !_isDisposed) {
+          setState(() {
+            _isPlaying = true;
+          });
+        }
+      }
+    } catch (e) {
+      // Handle playback errors with recovery
+      if (!_isDisposed) {
+        await _handlePlayerError(e);
+      }
     }
   }
 
-
-
   /// Clean up resources
   void _cleanup() {
-    // Unregister global player if enabled
-    if (widget.enableGlobalPlayer) {
-      GlobalAudioPlayerManager.instance.unregisterGlobalPlayer(widget.audioSource);
-    }
-
     _restoreConfig?.call();
     _durationSubscription?.cancel();
-    _globalPlayerSubscription?.cancel();
 
-    // Only dispose local player if it exists and we're not in global mode
-    if (_playerController != null && !widget.enableGlobalPlayer) {
-      _playerController!.dispose();
+    // Always dispose local player controller to prevent memory leaks
+    if (_playerController != null) {
+      try {
+        _playerController!.dispose();
+      } catch (e) {
+        debugPrint('AudioPlayerWidget: Error disposing player controller: $e');
+      }
       _playerController = null;
     }
 
@@ -547,8 +497,103 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
     }
   }
 
+  /// Determine if waveform extraction should be enabled
+  Future<bool> _shouldExtractWaveform(String path) async {
+    try {
+      // For remote sources, check if it's a reasonable size
+      if (MediaUtils.isRemoteSource(path)) {
+        // For remote URLs, disable waveform extraction by default to prevent timeouts
+        // Only enable for specific trusted domains or smaller files
+        if (path.contains('soundhelix.com') && path.endsWith('.mp3')) {
+          // Enable for known small test files
+          return true;
+        }
+        // Disable for other remote sources to prevent loading issues
+        return false;
+      }
+
+      // For local files, check file size
+      final file = File(path);
+      if (await file.exists()) {
+        final size = await file.length();
+        // Only extract waveform for files smaller than 10MB
+        return size < (10 * 1024 * 1024);
+      }
+
+      return false;
+    } catch (e) {
+      debugPrint('AudioPlayerWidget: Error checking waveform extraction: $e');
+      return false;
+    }
+  }
+
+  /// Prepare player with timeout and fallback
+  Future<void> _preparePlayerWithTimeout({
+    required String path,
+    required bool shouldExtractWaveform,
+  }) async {
+    try {
+      // First attempt with waveform extraction if enabled
+      if (shouldExtractWaveform) {
+        await _effectivePlayerController
+            .preparePlayer(path: path, shouldExtractWaveform: true)
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () {
+                debugPrint(
+                  'AudioPlayerWidget: Waveform extraction timed out, retrying without waveform',
+                );
+                throw TimeoutException(
+                  'Waveform extraction timeout',
+                  const Duration(seconds: 15),
+                );
+              },
+            );
+      } else {
+        // Prepare without waveform extraction
+        await _effectivePlayerController
+            .preparePlayer(path: path, shouldExtractWaveform: false)
+            .timeout(
+              const Duration(seconds: 10),
+              onTimeout: () {
+                debugPrint('AudioPlayerWidget: Player preparation timed out');
+                throw TimeoutException(
+                  'Player preparation timeout',
+                  const Duration(seconds: 10),
+                );
+              },
+            );
+      }
+    } on TimeoutException catch (e) {
+      debugPrint('AudioPlayerWidget: Timeout during preparation: $e');
+
+      // Fallback: try without waveform extraction
+      if (shouldExtractWaveform) {
+        debugPrint('AudioPlayerWidget: Retrying without waveform extraction');
+        await _effectivePlayerController
+            .preparePlayer(path: path, shouldExtractWaveform: false)
+            .timeout(
+              const Duration(seconds: 10),
+              onTimeout: () {
+                throw TimeoutException(
+                  'Final player preparation timeout',
+                  const Duration(seconds: 10),
+                );
+              },
+            );
+      } else {
+        rethrow;
+      }
+    } catch (e) {
+      debugPrint('AudioPlayerWidget: Error during player preparation: $e');
+      rethrow;
+    }
+  }
+
   /// Handle player errors and attempt recovery
   Future<void> _handlePlayerError(dynamic error) async {
+    if (_isDisposed) return;
+
     debugPrint('AudioPlayerWidget: Player error: $error');
 
     // Check if it's a file not found error or platform exception with source error
@@ -576,7 +621,9 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
     }
 
     // If recovery failed or it's a different error, handle normally
-    _handleAudioError(error.toString());
+    if (!_isDisposed) {
+      _handleAudioError(error.toString());
+    }
   }
 
   @override

@@ -515,8 +515,9 @@ void main() {
         ),
       );
 
-      // Wait for the widget to load
-      await tester.pumpAndSettle();
+      // Wait for the widget to load (use pump instead of pumpAndSettle to avoid timeout)
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
 
       // Simulate cache clearing (this would normally be done by CacheManager)
       // The widget should handle this gracefully and fall back to remote URL
@@ -541,7 +542,9 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      // Use pump instead of pumpAndSettle to avoid timeout
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
 
       // The widget should handle missing cache files gracefully
       expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);

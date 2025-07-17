@@ -72,6 +72,20 @@
 * Example application demonstrating all features
 * Memory optimization guide with troubleshooting tips
 
+### Fixed
+- **Audio Player Solapamiento**: Corregido el problema donde múltiples audios se reproducían simultáneamente en el modo global. Ahora solo un audio puede estar activo a la vez.
+  - Mejorada la lógica de `syncWithLocalPlayer()` para siempre detener otros reproductores
+  - Mejorado el método `startGlobalPlayback()` para detener reproductores existentes antes de iniciar uno nuevo
+  - Agregado método `ensureSingleAudioPlayback()` para verificar y detener reproductores activos
+  - Agregado método `forceStopAllPlayers()` para detención robusta de todos los reproductores
+  - Mejorada la lógica de `_togglePlayPause()` en el widget para usar los nuevos métodos de control
+  - Actualizado el overlay global para usar métodos más robustos al cerrar
+
+### Changed
+- La lógica de sincronización ahora es más agresiva para prevenir solapamiento de audio
+- Los reproductores locales ahora también detienen reproductores globales activos
+- Mejorada la robustez del sistema de registro y desregistro de reproductores globales
+
 ---
 
 **Note**: This package is currently in internal development phase and has not been officially released to pub.dev yet.

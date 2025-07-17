@@ -42,11 +42,12 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     // Initialize with custom cache config
     _currentCacheConfig = const CacheConfig(
-      maxImageCacheSize: 150 * 1024 * 1024, // 150MB
-      maxVideoCacheSize: 750 * 1024 * 1024, // 750MB
+      maxAudioCacheSize: 100 * 1024 * 1024, // 100MB
+      maxVideoCacheSize: 200 * 1024 * 1024, // 200MB
+      maxImageCacheSize: 50 * 1024 * 1024, // 50MB
       enableAutoCleanup: true,
-      cleanupThreshold: 0.6, // 60%
-      maxCacheAgeDays: 7, // 7 days
+      cleanupThreshold: 0.8, // 80%
+      maxCacheAgeDays: 7, // 7 días
     );
     CacheManager.instance.updateConfig(_currentCacheConfig);
   }
@@ -60,14 +61,6 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: Column(
         children: [
-          // Global Audio Player Overlay - appears when global audio is playing
-          const SmartGlobalAudioPlayerOverlay(
-            backgroundColor: Color(0xFF4A4A4A), // Dark gray like WhatsApp
-            showCloseButton: true,
-            closeIcon: Icons.close,
-            showSpeedButton: true,
-          ),
-
           // Main content
           Expanded(
             child: IndexedStack(
