@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 import 'package:flutter/material.dart';
 
 import 'global_audio_player_manager.dart';
@@ -39,16 +40,22 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
   @override
   void initState() {
     super.initState();
+    log('GlobalAudioPlayerOverlay: initState called');
     _initializeAnimations();
     _setupListeners();
 
     // Usar un microtask para asegurar que las animaciones estén listas
+    // NO ejecutar _updateCurrentAudio() inmediatamente para evitar que aparezca al abrir la app
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        log(
+          'GlobalAudioPlayerOverlay: Post frame callback - setting initialized',
+        );
         setState(() {
           _isInitialized = true;
         });
-        _updateCurrentAudio();
+        // Solo actualizar si hay audios reproduciéndose, no al inicializar
+        _checkForPlayingAudios();
       }
     });
   }
@@ -94,32 +101,49 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
         });
   }
 
-  void _updateCurrentAudio() {
+  /// Verifica si hay audios reproduciéndose sin mostrar el overlay al inicializar
+  void _checkForPlayingAudios() {
     if (!_isInitialized || !mounted) return;
 
     final audios = GlobalAudioPlayerManager.instance.activeAudios;
 
-    // Buscar el primer audio global que esté reproduciéndose
-    GlobalAudioInfo? playingAudio;
+    // Solo verificar si hay audios reproduciéndose, no actualizar el overlay
     for (final audio in audios) {
       if (audio.isGlobal && audio.isPlaying.value) {
-        playingAudio = audio;
+        // Si hay un audio reproduciéndose, configurar el overlay
+        _updateCurrentAudio();
+        return;
+      }
+    }
+
+    // Si no hay audios reproduciéndose, no hacer nada
+    log('GlobalAudioPlayerOverlay: No playing audios found on initialization');
+  }
+
+  void _updateCurrentAudio() {
+    if (!_isInitialized || !mounted) return;
+
+    final audios = GlobalAudioPlayerManager.instance.activeAudios;
+    log('GlobalAudioPlayerOverlay: Active audios count: ${audios.length}');
+
+    // Buscar el primer audio global activo (reproduciéndose o pausado)
+    GlobalAudioInfo? activeAudio;
+    for (final audio in audios) {
+      log(
+        'GlobalAudioPlayerOverlay: Checking audio - isGlobal: ${audio.isGlobal}, isPlaying: ${audio.isPlaying.value}, title: ${audio.title}',
+      );
+      if (audio.isGlobal) {
+        activeAudio = audio;
         break;
       }
     }
 
-    // Si no hay audio global reproduciéndose, usar el último audio global de la lista
-    if (playingAudio == null) {
-      for (final audio in audios.reversed) {
-        if (audio.isGlobal) {
-          playingAudio = audio;
-          break;
-        }
-      }
-    }
-
-    final newPlayerId = playingAudio?.playerId;
+    final newPlayerId = activeAudio?.playerId;
     final hasChanged = newPlayerId != _currentPlayerId;
+
+    log(
+      'GlobalAudioPlayerOverlay: Found active audio - playerId: $newPlayerId, hasChanged: $hasChanged',
+    );
 
     if (hasChanged) {
       // Remover listener anterior
@@ -129,7 +153,7 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
 
       setState(() {
         _currentPlayerId = newPlayerId;
-        _currentAudioInfo = playingAudio;
+        _currentAudioInfo = activeAudio;
       });
 
       // Configurar listeners para el audio actual
@@ -145,16 +169,21 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
     if (!_isInitialized || !mounted) return;
 
     final hasAudio = _currentAudioInfo != null;
-    final isPlaying = _currentAudioInfo?.isPlaying.value ?? false;
 
-    // Solo mostrar overlay si hay un audio global activo Y está reproduciéndose
-    // Esto evita que aparezca al abrir la app
-    if (hasAudio && isPlaying) {
+    log(
+      'GlobalAudioPlayerOverlay: State change - hasAudio: $hasAudio, animationStatus: ${_overlayAnimationController.status}',
+    );
+
+    // Mostrar overlay si hay un audio global activo (reproduciéndose o pausado)
+    // Esto permite que el overlay permanezca visible para controlar el audio
+    if (hasAudio) {
       if (_overlayAnimationController.status != AnimationStatus.completed) {
+        log('GlobalAudioPlayerOverlay: Showing overlay');
         _overlayAnimationController.forward();
       }
     } else {
       if (_overlayAnimationController.status != AnimationStatus.dismissed) {
+        log('GlobalAudioPlayerOverlay: Hiding overlay');
         _overlayAnimationController.reverse();
       }
     }
@@ -173,11 +202,19 @@ class _GlobalAudioPlayerOverlayState extends State<GlobalAudioPlayerOverlay>
 
   @override
   Widget build(BuildContext context) {
+    log(
+      'GlobalAudioPlayerOverlay: build called - isInitialized: $_isInitialized, hasAudio: ${_currentAudioInfo != null}',
+    );
+
     // No mostrar nada hasta que esté inicializado
     if (!_isInitialized) {
+      log(
+        'GlobalAudioPlayerOverlay: Not initialized, returning SizedBox.shrink',
+      );
       return const SizedBox.shrink();
     }
 
+    log('GlobalAudioPlayerOverlay: Building overlay widget');
     return SlideTransition(
       position: _slideAnimation,
       child: FadeTransition(
