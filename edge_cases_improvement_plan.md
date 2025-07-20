@@ -103,23 +103,37 @@ Análisis y mejora de edge cases en `GlobalAudioPlayerManager` y `CacheManager` 
 - Agregado soporte de prioridades en API pública: `cacheAudio()` y `cacheVideo()` con parámetro `DownloadPriority`
 - Removidas variables globales obsoletas de concurrencia
 - Agregadas estadísticas de monitoreo y logs detallados para debugging
-- **Commit**: Pendiente
+- **Commit**: `d588c83` - feat(cache): implement priority-based download concurrency system
 
-## Fase 5: CacheManager - Gestión de Espacio en Disco
+## Fase 5: CacheManager - Gestión de Espacio en Disco ✅ COMPLETADA
 
 ### 5.1 Problemas Identificados
 - **Cleanup durante escritura**: Puede eliminar archivos parciales
 - **Sin verificación de espacio**: No verifica espacio disponible antes de descargar
 - **Cleanup no considera archivos en uso**: Puede eliminar archivos siendo reproducidos
 
-### 5.2 Soluciones Propuestas
-- [ ] Implementar locks de archivo durante escritura/cleanup
-- [ ] Verificar espacio disponible antes de iniciar descargas
-- [ ] Mantener registro de archivos en uso activo
-- [ ] Implementar cleanup inteligente con prioridades
+### 5.2 Soluciones Implementadas
+- [x] Implementar locks de archivo durante escritura/cleanup
+- [x] Verificar espacio disponible antes de iniciar descargas
+- [x] Mantener registro de archivos en uso activo
+- [x] Implementar cleanup inteligente con prioridades
 
-### 5.3 Archivos a Modificar
+### 5.3 Archivos Modificados
 - `lib/src/utils/cache_manager.dart`
+
+### 5.4 Cambios Implementados
+- Creada clase `FileLockManager` para gestión de locks de archivos durante escritura/cleanup
+- Implementada clase `DiskSpaceManager` para gestión inteligente de espacio y archivos activos
+- Agregadas verificaciones de espacio disponible antes de iniciar descargas con estimaciones conservadoras
+- Sistema de archivos activos que protege archivos en uso del cleanup automático
+- Implementado cleanup inteligente que respeta archivos activos y locks
+- Mejorados métodos `_downloadAudioFile` y `_downloadVideoFile` con verificación de espacio y locks
+- Actualizado método `_performSmartCleanup` que limpia de manera selectiva respetando archivos activos
+- Refactorizados métodos `_cleanupAudioCache` y `_cleanupVideoCache` para usar el nuevo sistema
+- Agregada API pública para gestión manual de archivos activos y cleanup inteligente
+- Estadísticas expandidas de cache que incluyen información de locks y gestión de espacio
+- Métodos de utilidad: `markFileAsActive()`, `performSmartCleanup()`, `getAvailableSpace()`, `hasEnoughSpace()`
+- **Commit**: Pendiente
 
 ## Fase 6: CacheManager - Manejo de Errores de Red
 

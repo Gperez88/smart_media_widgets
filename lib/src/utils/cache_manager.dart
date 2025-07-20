@@ -239,6 +239,209 @@ class _DownloadRequest {
   }
 }
 
+/// Gestiona locks de archivos durante operaciones de E/S
+class FileLockManager {
+  static final FileLockManager _instance = FileLockManager._internal();
+  factory FileLockManager() => _instance;
+  FileLockManager._internal();
+
+  // Mapas para rastrear archivos que están siendo escritos o limpiados
+  final Set<String> _filesBeingWritten = {};
+  final Set<String> _filesBeingCleaned = {};
+
+  /// Adquiere un lock de escritura para un archivo
+  bool acquireWriteLock(String filePath) {
+    if (_filesBeingCleaned.contains(filePath) || _filesBeingWritten.contains(filePath)) {
+      return false;
+    }
+    _filesBeingWritten.add(filePath);
+    log('FileLockManager: Acquired write lock for: $filePath');
+    return true;
+  }
+
+  /// Libera un lock de escritura para un archivo
+  void releaseWriteLock(String filePath) {
+    _filesBeingWritten.remove(filePath);
+    log('FileLockManager: Released write lock for: $filePath');
+  }
+
+  /// Adquiere un lock de limpieza para un archivo
+  bool acquireCleanupLock(String filePath) {
+    if (_filesBeingWritten.contains(filePath) || _filesBeingCleaned.contains(filePath)) {
+      return false;
+    }
+    _filesBeingCleaned.add(filePath);
+    return true;
+  }
+
+  /// Libera un lock de limpieza para un archivo
+  void releaseCleanupLock(String filePath) {
+    _filesBeingCleaned.remove(filePath);
+  }
+
+  /// Verifica si un archivo puede ser limpiado de manera segura
+  bool canCleanupFile(String filePath) {
+    return !_filesBeingWritten.contains(filePath) && !_filesBeingCleaned.contains(filePath);
+  }
+
+  /// Obtiene estadísticas de locks activos
+  Map<String, dynamic> getStats() {
+    return {
+      'filesBeingWritten': _filesBeingWritten.length,
+      'filesBeingCleaned': _filesBeingCleaned.length,
+      'writtenFiles': _filesBeingWritten.toList(),
+      'cleanedFiles': _filesBeingCleaned.toList(),
+    };
+  }
+}
+
+/// Gestiona el espacio en disco y archivos activos
+class DiskSpaceManager {
+  static final DiskSpaceManager _instance = DiskSpaceManager._internal();
+  factory DiskSpaceManager() => _instance;
+  DiskSpaceManager._internal();
+
+  // Registro de archivos en uso activo (por URL para evitar cleanup)
+  final Set<String> _activeFiles = {};
+  final Map<String, DateTime> _lastAccessTime = {};
+
+  /// Marca un archivo como activo (en uso)
+  void markFileAsActive(String filePath) {
+    _activeFiles.add(filePath);
+    _lastAccessTime[filePath] = DateTime.now();
+    log('DiskSpaceManager: Marked file as active: $filePath');
+  }
+
+  /// Desmarca un archivo como activo
+  void unmarkFileAsActive(String filePath) {
+    _activeFiles.remove(filePath);
+    _lastAccessTime[filePath] = DateTime.now();
+    log('DiskSpaceManager: Unmarked file as active: $filePath');
+  }
+
+  /// Verifica si un archivo está activamente en uso
+  bool isFileActive(String filePath) {
+    return _activeFiles.contains(filePath);
+  }
+
+  /// Verifica el espacio disponible en disco
+  Future<int> getAvailableSpace(String directoryPath) async {
+    try {
+      final directory = Directory(directoryPath);
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+      
+      // En sistemas móviles, esto es una aproximación
+      // En un entorno real se usaría platform channels para obtener espacio exacto
+      final tempFile = File('${directory.path}/.space_check.tmp');
+      await tempFile.writeAsString('test');
+      await tempFile.delete();
+      
+      // Retornamos un valor conservador (1GB disponible por defecto)
+      // En producción esto debería ser implementado con platform channels
+      return 1024 * 1024 * 1024; // 1GB
+    } catch (e) {
+      log('DiskSpaceManager: Error checking available space: $e');
+      return 0;
+    }
+  }
+
+  /// Verifica si hay suficiente espacio para un archivo
+  Future<bool> hasEnoughSpace(String directoryPath, int requiredBytes) async {
+    final availableSpace = await getAvailableSpace(directoryPath);
+    final hasSpace = availableSpace >= requiredBytes * 1.2; // 20% buffer
+    
+    log('DiskSpaceManager: Space check - Required: ${requiredBytes ~/ 1024}KB, Available: ${availableSpace ~/ 1024}KB, HasSpace: $hasSpace');
+    return hasSpace;
+  }
+
+  /// Obtiene archivos ordenados por prioridad de limpieza
+  Future<List<File>> getFilesForCleanup(Directory directory, {bool includeActive = false}) async {
+    if (!await directory.exists()) return [];
+
+    final files = <File>[];
+    await for (final entity in directory.list(recursive: true)) {
+      if (entity is File) {
+        // Saltar archivos activos si no se incluyen explícitamente
+        if (!includeActive && isFileActive(entity.path)) {
+          continue;
+        }
+        files.add(entity);
+      }
+    }
+
+    // Ordenar por prioridad de limpieza (menos usados primero)
+    files.sort((a, b) {
+      final aLastAccess = _lastAccessTime[a.path];
+      final bLastAccess = _lastAccessTime[b.path];
+      
+      // Archivos sin registro de acceso van primero
+      if (aLastAccess == null && bLastAccess == null) {
+        return a.statSync().modified.compareTo(b.statSync().modified);
+      }
+      if (aLastAccess == null) return -1;
+      if (bLastAccess == null) return 1;
+      
+      return aLastAccess.compareTo(bLastAccess);
+    });
+
+    return files;
+  }
+
+  /// Limpia archivos automáticamente respetando archivos activos
+  Future<int> cleanupFilesRespectingActive(
+    Directory directory, 
+    int targetSizeReduction,
+    {bool emergencyMode = false}
+  ) async {
+    int cleanedSize = 0;
+    final fileLockManager = FileLockManager();
+    
+    final files = await getFilesForCleanup(directory, includeActive: emergencyMode);
+    
+    for (final file in files) {
+      if (cleanedSize >= targetSizeReduction) break;
+      
+      // Intentar adquirir lock de limpieza
+      if (!fileLockManager.acquireCleanupLock(file.path)) {
+        log('DiskSpaceManager: Skipping locked file: ${file.path}');
+        continue;
+      }
+      
+      try {
+        if (await file.exists()) {
+          final fileSize = await file.length();
+          await file.delete();
+          cleanedSize += fileSize;
+          
+          // Limpiar registros del archivo eliminado
+          _activeFiles.remove(file.path);
+          _lastAccessTime.remove(file.path);
+          
+          log('DiskSpaceManager: Deleted file: ${file.path} (${fileSize ~/ 1024}KB)');
+        }
+      } catch (e) {
+        log('DiskSpaceManager: Error deleting file ${file.path}: $e');
+      } finally {
+        fileLockManager.releaseCleanupLock(file.path);
+      }
+    }
+    
+    log('DiskSpaceManager: Cleanup completed - Target: ${targetSizeReduction ~/ 1024}KB, Cleaned: ${cleanedSize ~/ 1024}KB');
+    return cleanedSize;
+  }
+
+  /// Obtiene estadísticas del gestor de espacio
+  Map<String, dynamic> getStats() {
+    return {
+      'activeFiles': _activeFiles.length,
+      'trackedFiles': _lastAccessTime.length,
+      'activeFilesList': _activeFiles.toList(),
+    };
+  }
+}
+
 /// Configuration class for cache settings
 class CacheConfig {
   /// Maximum size for image cache in bytes (default: 100MB)
@@ -390,9 +593,15 @@ class CacheManager {
   
   // Gestor de concurrencia de descargas
   late final DownloadConcurrencyManager _downloadManager;
+  
+  // Gestores de locks y espacio en disco
+  late final FileLockManager _fileLockManager;
+  late final DiskSpaceManager _diskSpaceManager;
 
   CacheManager._internal() {
     _downloadManager = DownloadConcurrencyManager();
+    _fileLockManager = FileLockManager();
+    _diskSpaceManager = DiskSpaceManager();
   }
 
   /// Get current cache configuration
@@ -771,7 +980,7 @@ class CacheManager {
     }
   }
 
-  /// Descarga el archivo de audio (método auxiliar)
+  /// Descarga el archivo de audio (método auxiliar) con verificación de espacio y locks
   static Future<String?> _downloadAudioFile(String audioUrl) async {
     final manager = CacheManager.instance;
     
@@ -779,6 +988,8 @@ class CacheManager {
     final cachedPath = await getCachedAudioPath(audioUrl);
     if (cachedPath != null) {
       log('CacheManager: Audio already cached: $audioUrl');
+      // Marcar archivo como activo al accederlo
+      manager._diskSpaceManager.markFileAsActive(cachedPath);
       return cachedPath;
     }
 
@@ -791,48 +1002,87 @@ class CacheManager {
 
       if (await audioFile.exists()) {
         log('CacheManager: Audio already cached: $fileName');
+        manager._diskSpaceManager.markFileAsActive(audioFile.path);
         return audioFile.path;
       }
 
-      final client = http.Client();
-      try {
-        final request = http.Request('GET', Uri.parse(audioUrl));
-        final response = await client.send(request);
-
-        if (response.statusCode == 200) {
-          final sink = audioFile.openWrite();
-          try {
-            int totalBytes = 0;
-            await for (final chunk in response.stream) {
-              sink.add(chunk);
-              totalBytes += chunk.length;
-
-              if (totalBytes % (1024 * 1024) == 0) {
-                log(
-                  'CacheManager: Downloaded ${totalBytes ~/ (1024 * 1024)}MB for: $fileName',
-                );
-              }
-            }
-            await sink.close();
-
-            log(
-              'CacheManager: Successfully cached audio: $fileName (${totalBytes ~/ 1024}KB)',
-            );
-            return audioFile.path;
-          } catch (e) {
-            await sink.close();
-            if (await audioFile.exists()) {
-              await audioFile.delete();
-            }
-            log('CacheManager: Error writing audio file: $e');
-            rethrow;
-          }
-        } else {
-          log('CacheManager: HTTP error ${response.statusCode} for: $audioUrl');
+      // Verificar espacio disponible antes de descargar
+      const estimatedSize = 5 * 1024 * 1024; // Estimación conservadora de 5MB
+      final hasSpace = await manager._diskSpaceManager.hasEnoughSpace(
+        audioCacheDir.path, 
+        estimatedSize
+      );
+      
+      if (!hasSpace) {
+        log('CacheManager: Insufficient disk space for audio download: $audioUrl');
+        // Intentar limpiar espacio automáticamente
+        await manager._performSmartCleanup(audioType: true);
+        
+        // Verificar espacio nuevamente después del cleanup
+        final hasSpaceAfterCleanup = await manager._diskSpaceManager.hasEnoughSpace(
+          audioCacheDir.path, 
+          estimatedSize
+        );
+        
+        if (!hasSpaceAfterCleanup) {
+          log('CacheManager: Still insufficient space after cleanup for: $audioUrl');
           return null;
         }
+      }
+
+      // Intentar adquirir lock de escritura
+      if (!manager._fileLockManager.acquireWriteLock(audioFile.path)) {
+        log('CacheManager: Could not acquire write lock for: ${audioFile.path}');
+        return null;
+      }
+
+      try {
+        final client = http.Client();
+        try {
+          final request = http.Request('GET', Uri.parse(audioUrl));
+          final response = await client.send(request);
+
+          if (response.statusCode == 200) {
+            final sink = audioFile.openWrite();
+            try {
+              int totalBytes = 0;
+              await for (final chunk in response.stream) {
+                sink.add(chunk);
+                totalBytes += chunk.length;
+
+                if (totalBytes % (1024 * 1024) == 0) {
+                  log(
+                    'CacheManager: Downloaded ${totalBytes ~/ (1024 * 1024)}MB for: $fileName',
+                  );
+                }
+              }
+              await sink.close();
+
+              // Marcar archivo como activo al completar la descarga
+              manager._diskSpaceManager.markFileAsActive(audioFile.path);
+
+              log(
+                'CacheManager: Successfully cached audio: $fileName (${totalBytes ~/ 1024}KB)',
+              );
+              return audioFile.path;
+            } catch (e) {
+              await sink.close();
+              if (await audioFile.exists()) {
+                await audioFile.delete();
+              }
+              log('CacheManager: Error writing audio file: $e');
+              rethrow;
+            }
+          } else {
+            log('CacheManager: HTTP error ${response.statusCode} for: $audioUrl');
+            return null;
+          }
+        } finally {
+          client.close();
+        }
       } finally {
-        client.close();
+        // Siempre liberar el lock de escritura
+        manager._fileLockManager.releaseWriteLock(audioFile.path);
       }
     } catch (e) {
       log('CacheManager: Error caching audio: $e');
@@ -906,7 +1156,49 @@ class CacheManager {
     }
   }
 
-  /// Descarga el archivo de video (método auxiliar)
+  /// Realiza limpieza inteligente respetando archivos activos
+  Future<void> _performSmartCleanup({bool audioType = false, bool videoType = false}) async {
+    log('CacheManager: Starting smart cleanup - Audio: $audioType, Video: $videoType');
+    
+    try {
+      if (audioType) {
+        final audioCacheDir = await getAudioCacheDirectory();
+        const targetReduction = 50 * 1024 * 1024; // 50MB
+        final cleanedSize = await _diskSpaceManager.cleanupFilesRespectingActive(
+          audioCacheDir, 
+          targetReduction
+        );
+        log('CacheManager: Smart cleanup audio - Cleaned: ${cleanedSize ~/ 1024}KB');
+      }
+      
+      if (videoType) {
+        final videoCacheDir = await getVideoCacheDirectory();
+        const targetReduction = 100 * 1024 * 1024; // 100MB
+        final cleanedSize = await _diskSpaceManager.cleanupFilesRespectingActive(
+          videoCacheDir, 
+          targetReduction
+        );
+        log('CacheManager: Smart cleanup video - Cleaned: ${cleanedSize ~/ 1024}KB');
+      }
+      
+      // Si no se especifica tipo, limpiar ambos con moderación
+      if (!audioType && !videoType) {
+        final audioCacheDir = await getAudioCacheDirectory();
+        final videoCacheDir = await getVideoCacheDirectory();
+        
+        await Future.wait([
+          _diskSpaceManager.cleanupFilesRespectingActive(audioCacheDir, 25 * 1024 * 1024), // 25MB
+          _diskSpaceManager.cleanupFilesRespectingActive(videoCacheDir, 50 * 1024 * 1024), // 50MB
+        ]);
+        
+        log('CacheManager: Smart cleanup completed for both audio and video');
+      }
+    } catch (e) {
+      log('CacheManager: Error during smart cleanup: $e');
+    }
+  }
+
+  /// Descarga el archivo de video (método auxiliar) con verificación de espacio y locks
   static Future<String?> _downloadVideoFile(String videoUrl) async {
     final manager = CacheManager.instance;
     
@@ -914,6 +1206,8 @@ class CacheManager {
     final cachedPath = await getCachedVideoPath(videoUrl);
     if (cachedPath != null) {
       log('CacheManager: Video already cached: $videoUrl');
+      // Marcar archivo como activo al accederlo
+      manager._diskSpaceManager.markFileAsActive(cachedPath);
       return cachedPath;
     }
 
@@ -926,48 +1220,87 @@ class CacheManager {
 
       if (await videoFile.exists()) {
         log('CacheManager: Video already cached: $fileName');
+        manager._diskSpaceManager.markFileAsActive(videoFile.path);
         return videoFile.path;
       }
 
-      final client = http.Client();
-      try {
-        final request = http.Request('GET', Uri.parse(videoUrl));
-        final response = await client.send(request);
-
-        if (response.statusCode == 200) {
-          final sink = videoFile.openWrite();
-          try {
-            int totalBytes = 0;
-            await for (final chunk in response.stream) {
-              sink.add(chunk);
-              totalBytes += chunk.length;
-
-              if (totalBytes % (5 * 1024 * 1024) == 0) {
-                log(
-                  'CacheManager: Downloaded ${totalBytes ~/ (1024 * 1024)}MB for: $fileName',
-                );
-              }
-            }
-            await sink.close();
-
-            log(
-              'CacheManager: Successfully cached video: $fileName (${totalBytes ~/ 1024}MB)',
-            );
-            return videoFile.path;
-          } catch (e) {
-            await sink.close();
-            if (await videoFile.exists()) {
-              await videoFile.delete();
-            }
-            log('CacheManager: Error writing video file: $e');
-            rethrow;
-          }
-        } else {
-          log('CacheManager: HTTP error ${response.statusCode} for: $videoUrl');
+      // Verificar espacio disponible antes de descargar (estimación más alta para videos)
+      const estimatedSize = 50 * 1024 * 1024; // Estimación conservadora de 50MB
+      final hasSpace = await manager._diskSpaceManager.hasEnoughSpace(
+        videoCacheDir.path, 
+        estimatedSize
+      );
+      
+      if (!hasSpace) {
+        log('CacheManager: Insufficient disk space for video download: $videoUrl');
+        // Intentar limpiar espacio automáticamente
+        await manager._performSmartCleanup(videoType: true);
+        
+        // Verificar espacio nuevamente después del cleanup
+        final hasSpaceAfterCleanup = await manager._diskSpaceManager.hasEnoughSpace(
+          videoCacheDir.path, 
+          estimatedSize
+        );
+        
+        if (!hasSpaceAfterCleanup) {
+          log('CacheManager: Still insufficient space after cleanup for: $videoUrl');
           return null;
         }
+      }
+
+      // Intentar adquirir lock de escritura
+      if (!manager._fileLockManager.acquireWriteLock(videoFile.path)) {
+        log('CacheManager: Could not acquire write lock for: ${videoFile.path}');
+        return null;
+      }
+
+      try {
+        final client = http.Client();
+        try {
+          final request = http.Request('GET', Uri.parse(videoUrl));
+          final response = await client.send(request);
+
+          if (response.statusCode == 200) {
+            final sink = videoFile.openWrite();
+            try {
+              int totalBytes = 0;
+              await for (final chunk in response.stream) {
+                sink.add(chunk);
+                totalBytes += chunk.length;
+
+                if (totalBytes % (5 * 1024 * 1024) == 0) {
+                  log(
+                    'CacheManager: Downloaded ${totalBytes ~/ (1024 * 1024)}MB for: $fileName',
+                  );
+                }
+              }
+              await sink.close();
+
+              // Marcar archivo como activo al completar la descarga
+              manager._diskSpaceManager.markFileAsActive(videoFile.path);
+
+              log(
+                'CacheManager: Successfully cached video: $fileName (${totalBytes ~/ 1024}MB)',
+              );
+              return videoFile.path;
+            } catch (e) {
+              await sink.close();
+              if (await videoFile.exists()) {
+                await videoFile.delete();
+              }
+              log('CacheManager: Error writing video file: $e');
+              rethrow;
+            }
+          } else {
+            log('CacheManager: HTTP error ${response.statusCode} for: $videoUrl');
+            return null;
+          }
+        } finally {
+          client.close();
+        }
       } finally {
-        client.close();
+        // Siempre liberar el lock de escritura
+        manager._fileLockManager.releaseWriteLock(videoFile.path);
       }
     } catch (e) {
       log('CacheManager: Error caching video: $e');
@@ -1158,79 +1491,53 @@ class CacheManager {
     }
   }
 
-  /// Cleanup video cache to reduce size
+  /// Cleanup video cache to reduce size respetando archivos activos y locks
   Future<void> _cleanupVideoCache(int currentSize) async {
     if (currentSize <= _config.maxVideoCacheSize) return;
 
     try {
       final videoCacheDir = await getVideoCacheDirectory();
-      final files = <File>[];
-
-      // Collect all files with their modification times
-      await for (final file in videoCacheDir.list(recursive: true)) {
-        if (file is File) {
-          files.add(file);
-        }
-      }
-
-      // Sort by modification time (oldest first)
-      files.sort((a, b) {
-        return a.statSync().modified.compareTo(b.statSync().modified);
-      });
-
-      // Remove oldest files until we're under the limit
-      final int sizeToRemove = currentSize - _config.maxVideoCacheSize;
-      int removedSize = 0;
-
-      for (final file in files) {
-        if (removedSize >= sizeToRemove) break;
-
-        try {
-          final fileSize = await file.length();
-          await file.delete();
-          removedSize += fileSize;
-        } catch (e) {
-          // Skip files that can't be deleted
-        }
-      }
+      final sizeToRemove = currentSize - _config.maxVideoCacheSize;
+      
+      log('CacheManager: Starting video cleanup - Current: ${currentSize ~/ 1024}KB, Target: ${_config.maxVideoCacheSize ~/ 1024}KB, ToRemove: ${sizeToRemove ~/ 1024}KB');
+      
+      // Usar el nuevo sistema de cleanup inteligente
+      final cleanedSize = await _diskSpaceManager.cleanupFilesRespectingActive(
+        videoCacheDir, 
+        sizeToRemove
+      );
+      
+      log('CacheManager: Video cleanup completed - Cleaned: ${cleanedSize ~/ 1024}KB');
     } catch (e) {
-      // Handle cleanup errors silently
+      log('CacheManager: Error during video cleanup: $e');
     }
   }
 
-  /// Cleanup audio cache to reduce size
+  /// Cleanup audio cache to reduce size respetando archivos activos y locks
   Future<void> _cleanupAudioCache(int currentSize) async {
     if (currentSize <= _config.maxAudioCacheSize) return;
+    
     try {
       final audioCacheDir = await getAudioCacheDirectory();
-      final files = <File>[];
-      await for (final file in audioCacheDir.list(recursive: true)) {
-        if (file is File) {
-          files.add(file);
-        }
-      }
-      files.sort((a, b) {
-        return a.statSync().modified.compareTo(b.statSync().modified);
-      });
-      final int sizeToRemove = currentSize - _config.maxAudioCacheSize;
-      int removedSize = 0;
-      for (final file in files) {
-        if (removedSize >= sizeToRemove) break;
-        try {
-          final fileSize = await file.length();
-          await file.delete();
-          removedSize += fileSize;
-        } catch (e) {
-          // Skip files that can't be deleted
-        }
-      }
+      final sizeToRemove = currentSize - _config.maxAudioCacheSize;
+      
+      log('CacheManager: Starting audio cleanup - Current: ${currentSize ~/ 1024}KB, Target: ${_config.maxAudioCacheSize ~/ 1024}KB, ToRemove: ${sizeToRemove ~/ 1024}KB');
+      
+      // Usar el nuevo sistema de cleanup inteligente
+      final cleanedSize = await _diskSpaceManager.cleanupFilesRespectingActive(
+        audioCacheDir, 
+        sizeToRemove
+      );
+      
+      log('CacheManager: Audio cleanup completed - Cleaned: ${cleanedSize ~/ 1024}KB');
     } catch (e) {
-      // Handle cleanup errors silently
+      log('CacheManager: Error during audio cleanup: $e');
     }
   }
 
-  /// Get cache statistics
+  /// Get cache statistics including new disk management stats
   static Future<Map<String, dynamic>> getCacheStats() async {
+    final manager = CacheManager.instance;
     final imageSize = await getImageCacheSize();
     final videoSize = await getVideoCacheSize();
     final audioSize = await getAudioCacheSize();
@@ -1245,6 +1552,12 @@ class CacheManager {
       'videoCacheSizeFormatted': formatCacheSize(videoSize),
       'audioCacheSizeFormatted': formatCacheSize(audioSize),
       'totalCacheSizeFormatted': formatCacheSize(totalSize),
+      // Estadísticas de gestión de concurrencia
+      'downloadStats': manager._downloadManager.getStats(),
+      // Estadísticas de locks de archivos
+      'fileLockStats': manager._fileLockManager.getStats(),
+      // Estadísticas de gestión de espacio
+      'diskSpaceStats': manager._diskSpaceManager.getStats(),
     };
   }
 
@@ -1282,6 +1595,53 @@ class CacheManager {
       'shouldUseStreaming': !isCached,
       'recommendedApproach': isCached ? 'local_file' : 'network_streaming',
     };
+  }
+
+  /// Marca un archivo como activo (en uso) para protegerlo del cleanup
+  static void markFileAsActive(String filePath) {
+    final manager = CacheManager.instance;
+    manager._diskSpaceManager.markFileAsActive(filePath);
+  }
+
+  /// Desmarca un archivo como activo
+  static void unmarkFileAsActive(String filePath) {
+    final manager = CacheManager.instance;
+    manager._diskSpaceManager.unmarkFileAsActive(filePath);
+  }
+
+  /// Verifica si un archivo está activo (protegido del cleanup)
+  static bool isFileActive(String filePath) {
+    final manager = CacheManager.instance;
+    return manager._diskSpaceManager.isFileActive(filePath);
+  }
+
+  /// Realiza cleanup inteligente manual respetando archivos activos
+  static Future<void> performSmartCleanup({
+    bool audioType = false, 
+    bool videoType = false,
+  }) async {
+    final manager = CacheManager.instance;
+    await manager._performSmartCleanup(audioType: audioType, videoType: videoType);
+  }
+
+  /// Verifica el espacio disponible en disco para el directorio de cache
+  static Future<int> getAvailableSpace() async {
+    final manager = CacheManager.instance;
+    final tempDir = await getTemporaryDirectory();
+    return await manager._diskSpaceManager.getAvailableSpace(tempDir.path);
+  }
+
+  /// Verifica si hay suficiente espacio para un archivo de tamaño estimado
+  static Future<bool> hasEnoughSpace(int requiredBytes) async {
+    final manager = CacheManager.instance;
+    final tempDir = await getTemporaryDirectory();
+    return await manager._diskSpaceManager.hasEnoughSpace(tempDir.path, requiredBytes);
+  }
+
+  /// Configura límites de concurrencia de descargas
+  static void configureConcurrencyLimits({int? maxAudio, int? maxVideo}) {
+    final manager = CacheManager.instance;
+    manager._downloadManager.updateLimits(maxAudio: maxAudio, maxVideo: maxVideo);
   }
 }
 
