@@ -33,9 +33,25 @@ class GlobalAudioInfo {
   });
 
   void dispose() {
-    positionSubscription?.cancel();
-    waveformSubscription?.cancel();
-    playerController.dispose();
+    // Cancelar subscripciones de manera segura
+    try {
+      positionSubscription?.cancel();
+    } catch (e) {
+      log('GlobalAudioInfo: Error canceling position subscription for $playerId: $e');
+    }
+    
+    try {
+      waveformSubscription?.cancel();
+    } catch (e) {
+      log('GlobalAudioInfo: Error canceling waveform subscription for $playerId: $e');
+    }
+    
+    // Dispose del player controller de manera segura
+    try {
+      playerController.dispose();
+    } catch (e) {
+      log('GlobalAudioInfo: Error disposing player controller for $playerId: $e');
+    }
   }
 }
 
@@ -57,6 +73,12 @@ class GlobalAudioPlayerManager {
   
   // Mutex para sincronización de callbacks
   final Map<String, bool> _callbackLocks = {};
+
+  // Límites para callbacks (prevenir acumulación excesiva en apps de chat)
+  static const int _maxCallbacksPerPlayer = 10;
+
+  // Timer para limpieza automática de callbacks huérfanos
+  Timer? _cleanupTimer;
 
   // Mapa de audios activos por playerId
   final Map<String, GlobalAudioInfo> _activeAudios = {};
@@ -168,6 +190,66 @@ class GlobalAudioPlayerManager {
     }
   }
 
+  /// Agrega un callback a una lista con límite máximo
+  void _addCallbackWithLimit<T>(Map<String, List<T>> callbackMap, String playerId, T callback) {
+    callbackMap[playerId] ??= [];
+    final callbacks = callbackMap[playerId]!;
+    
+    // Si se alcanza el límite, remover el más antiguo
+    if (callbacks.length >= _maxCallbacksPerPlayer) {
+      callbacks.removeAt(0);
+      log('GlobalAudioPlayerManager: Callback limit reached for $playerId, removing oldest callback');
+    }
+    
+    callbacks.add(callback);
+  }
+
+  /// Obtiene estadísticas de callbacks para un playerId
+  Map<String, int> getCallbackStats(String playerId) {
+    return {
+      'onPlay': _onPlayCallbacks[playerId]?.length ?? 0,
+      'onPause': _onPauseCallbacks[playerId]?.length ?? 0,
+      'onStop': _onStopCallbacks[playerId]?.length ?? 0,
+      'onPositionChanged': _onPositionChangedCallbacks[playerId]?.length ?? 0,
+      'onWaveformData': _onWaveformDataCallbacks[playerId]?.length ?? 0,
+    };
+  }
+
+  /// Limpia callbacks huérfanos (para playerIds que ya no existen)
+  void _cleanupOrphanedCallbacks() {
+    final activePlayerIds = Set.from(_activeAudios.keys);
+    final preparingPlayerIds = Set.from(_preparingAudios.keys);
+    final allValidPlayerIds = activePlayerIds.union(preparingPlayerIds);
+
+    // Limpiar callbacks para playerIds que ya no están activos ni preparándose
+    _onPlayCallbacks.removeWhere((playerId, _) => !allValidPlayerIds.contains(playerId));
+    _onPauseCallbacks.removeWhere((playerId, _) => !allValidPlayerIds.contains(playerId));
+    _onStopCallbacks.removeWhere((playerId, _) => !allValidPlayerIds.contains(playerId));
+    _onPositionChangedCallbacks.removeWhere((playerId, _) => !allValidPlayerIds.contains(playerId));
+    _onWaveformDataCallbacks.removeWhere((playerId, _) => !allValidPlayerIds.contains(playerId));
+    _callbackLocks.removeWhere((playerId, _) => !allValidPlayerIds.contains(playerId));
+
+    log('GlobalAudioPlayerManager: Cleaned up orphaned callbacks. Active players: ${activePlayerIds.length}, Preparing: ${preparingPlayerIds.length}');
+  }
+
+  /// Ejecuta limpieza automática de callbacks huérfanos periódicamente
+  void _scheduleOrphanedCallbackCleanup() {
+    // Solo crear un timer si no existe uno
+    if (_cleanupTimer?.isActive != true) {
+      _cleanupTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+        _cleanupOrphanedCallbacks();
+        
+        // Si no hay audios activos ni preparándose, cancelar el timer
+        if (_activeAudios.isEmpty && _preparingAudios.isEmpty) {
+          timer.cancel();
+          _cleanupTimer = null;
+          log('GlobalAudioPlayerManager: Canceled orphaned callback cleanup timer');
+        }
+      });
+      log('GlobalAudioPlayerManager: Started orphaned callback cleanup timer');
+    }
+  }
+
   /// Prepara un nuevo audio para reproducción
   Future<void> prepareAudio(
     String audioSource, {
@@ -213,84 +295,103 @@ class GlobalAudioPlayerManager {
 
       // Crear un nuevo controlador para este audio
       final playerController = PlayerController();
-
-      // Preparar el audio con timeout
-      await playerController
-          .preparePlayer(
-            path: audioSource,
-            shouldExtractWaveform: shouldExtractWaveform,
-          )
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw TimeoutException(
-                'Audio preparation timeout',
-                const Duration(seconds: 10),
-              );
-            },
-          );
-
-      // Crear notifiers para este audio
-      final isPlaying = ValueNotifier<bool>(false);
-      final position = ValueNotifier<Duration>(Duration.zero);
-      final duration = ValueNotifier<Duration>(const Duration(minutes: 3));
-      final waveformData = ValueNotifier<List<double>?>(null);
-
-      // Obtener la duración real del audio
-      try {
-        final actualDuration = await playerController.getDuration();
-        if (actualDuration > 0) {
-          duration.value = Duration(milliseconds: actualDuration);
-        }
-      } catch (e) {
-        log('GlobalAudioPlayerManager: Error getting duration: $e');
-      }
-
-      // Configurar listeners
-      final positionSubscription = playerController.onCurrentDurationChanged
-          .listen((durationInMillis) {
-            final newPosition = Duration(milliseconds: durationInMillis);
-            position.value = newPosition;
-
-            // Notificar callbacks
-            _safeExecuteParameterCallbacks(playerId, _onPositionChangedCallbacks[playerId], newPosition);
-          });
-
+      StreamSubscription? positionSubscription;
       StreamSubscription? waveformSubscription;
-      if (shouldExtractWaveform) {
-        waveformSubscription = playerController.onCurrentExtractedWaveformData
-            .listen((data) {
-              waveformData.value = data;
+
+      try {
+        // Preparar el audio con timeout
+        await playerController
+            .preparePlayer(
+              path: audioSource,
+              shouldExtractWaveform: shouldExtractWaveform,
+            )
+            .timeout(
+              const Duration(seconds: 10),
+              onTimeout: () {
+                throw TimeoutException(
+                  'Audio preparation timeout',
+                  const Duration(seconds: 10),
+                );
+              },
+            );
+
+        // Crear notifiers para este audio
+        final isPlaying = ValueNotifier<bool>(false);
+        final position = ValueNotifier<Duration>(Duration.zero);
+        final duration = ValueNotifier<Duration>(const Duration(minutes: 3));
+        final waveformData = ValueNotifier<List<double>?>(null);
+
+        // Obtener la duración real del audio
+        try {
+          final actualDuration = await playerController.getDuration();
+          if (actualDuration > 0) {
+            duration.value = Duration(milliseconds: actualDuration);
+          }
+        } catch (e) {
+          log('GlobalAudioPlayerManager: Error getting duration: $e');
+        }
+
+        // Configurar listeners
+        positionSubscription = playerController.onCurrentDurationChanged
+            .listen((durationInMillis) {
+              final newPosition = Duration(milliseconds: durationInMillis);
+              position.value = newPosition;
 
               // Notificar callbacks
-              _safeExecuteParameterCallbacks(playerId, _onWaveformDataCallbacks[playerId], data);
+              _safeExecuteParameterCallbacks(playerId, _onPositionChangedCallbacks[playerId], newPosition);
             });
+
+        if (shouldExtractWaveform) {
+          waveformSubscription = playerController.onCurrentExtractedWaveformData
+              .listen((data) {
+                waveformData.value = data;
+
+                // Notificar callbacks
+                _safeExecuteParameterCallbacks(playerId, _onWaveformDataCallbacks[playerId], data);
+              });
+        }
+
+        // Crear la información del audio
+        final audioInfo = GlobalAudioInfo(
+          audioSource: audioSource,
+          playerId: playerId,
+          title: title,
+          playerController: playerController,
+          isPlaying: isPlaying,
+          position: position,
+          duration: duration,
+          waveformData: waveformData,
+          positionSubscription: positionSubscription,
+          waveformSubscription: waveformSubscription,
+          isGlobal: isGlobal,
+        );
+
+        // Agregar a la lista de audios activos
+        _activeAudios[playerId] = audioInfo;
+
+        // Notificar cambio en la lista
+        _activeAudiosController.add(_activeAudios.values.toList());
+
+        log(
+          'GlobalAudioPlayerManager: Audio prepared successfully for playerId: $playerId',
+        );
+      } catch (e) {
+        // Limpiar recursos si hay error durante la preparación
+        log('GlobalAudioPlayerManager: Error during preparation, cleaning up resources for: $playerId');
+        
+        // Cancelar subscripciones si fueron creadas
+        await positionSubscription?.cancel();
+        await waveformSubscription?.cancel();
+        
+        // Intentar dispose del player controller
+        try {
+          playerController.dispose();
+        } catch (disposeError) {
+          log('GlobalAudioPlayerManager: Error disposing playerController: $disposeError');
+        }
+        
+        rethrow;
       }
-
-      // Crear la información del audio
-      final audioInfo = GlobalAudioInfo(
-        audioSource: audioSource,
-        playerId: playerId,
-        title: title,
-        playerController: playerController,
-        isPlaying: isPlaying,
-        position: position,
-        duration: duration,
-        waveformData: waveformData,
-        positionSubscription: positionSubscription,
-        waveformSubscription: waveformSubscription,
-        isGlobal: isGlobal,
-      );
-
-      // Agregar a la lista de audios activos
-      _activeAudios[playerId] = audioInfo;
-
-      // Notificar cambio en la lista
-      _activeAudiosController.add(_activeAudios.values.toList());
-
-      log(
-        'GlobalAudioPlayerManager: Audio prepared successfully for playerId: $playerId',
-      );
     } catch (e) {
       log('GlobalAudioPlayerManager: Error preparing audio: $e');
       rethrow;
@@ -413,38 +514,54 @@ class GlobalAudioPlayerManager {
       return;
     }
 
+    bool playerStopped = false;
+    bool resourcesDisposed = false;
+
     try {
+      // Intentar detener el player
       if (audioInfo.isPlaying.value) {
-        await audioInfo.playerController.stopPlayer();
+        try {
+          await audioInfo.playerController.stopPlayer();
+          playerStopped = true;
+        } catch (e) {
+          log('GlobalAudioPlayerManager: Error stopping player for $playerId: $e');
+          // Continuar con cleanup aunque falle el stop
+        }
+      } else {
+        playerStopped = true;
       }
 
-      // Notificar callbacks antes de eliminar
+      // Notificar callbacks antes de eliminar (independientemente del estado del player)
       _safeExecuteCallbacks(playerId, _onStopCallbacks[playerId]);
 
-      // Limpiar recursos
-      audioInfo.dispose();
+    } finally {
+      // Garantizar limpieza de recursos incluso si hay errores
+      try {
+        // Limpiar recursos
+        audioInfo.dispose();
+        resourcesDisposed = true;
+      } catch (e) {
+        log('GlobalAudioPlayerManager: Error disposing resources for $playerId: $e');
+      }
 
-      // Eliminar de la lista
+      // Eliminar de la lista (siempre)
       _activeAudios.remove(playerId);
 
-      // Limpiar callbacks
+      // Limpiar callbacks (siempre)
       _onPlayCallbacks.remove(playerId);
       _onPauseCallbacks.remove(playerId);
       _onStopCallbacks.remove(playerId);
       _onPositionChangedCallbacks.remove(playerId);
       _onWaveformDataCallbacks.remove(playerId);
 
-      // Notificar cambio en la lista
+      // Notificar cambio en la lista (siempre)
       _activeAudiosController.add(_activeAudios.values.toList());
 
-      log(
-        'GlobalAudioPlayerManager: Audio stopped and removed for playerId: $playerId',
-      );
-    } catch (e) {
-      log(
-        'GlobalAudioPlayerManager: Error stopping audio for playerId: $playerId - $e',
-      );
-      rethrow;
+      if (playerStopped && resourcesDisposed) {
+        log('GlobalAudioPlayerManager: Audio stopped and removed successfully for playerId: $playerId');
+      } else {
+        log('GlobalAudioPlayerManager: Audio removed with partial cleanup for playerId: $playerId (player stopped: $playerStopped, resources disposed: $resourcesDisposed)');
+      }
     }
   }
 
@@ -486,24 +603,19 @@ class GlobalAudioPlayerManager {
     Function(List<double>)? onWaveformData,
   }) {
     if (onPlay != null) {
-      _onPlayCallbacks[playerId] ??= [];
-      _onPlayCallbacks[playerId]!.add(onPlay);
+      _addCallbackWithLimit(_onPlayCallbacks, playerId, onPlay);
     }
     if (onPause != null) {
-      _onPauseCallbacks[playerId] ??= [];
-      _onPauseCallbacks[playerId]!.add(onPause);
+      _addCallbackWithLimit(_onPauseCallbacks, playerId, onPause);
     }
     if (onStop != null) {
-      _onStopCallbacks[playerId] ??= [];
-      _onStopCallbacks[playerId]!.add(onStop);
+      _addCallbackWithLimit(_onStopCallbacks, playerId, onStop);
     }
     if (onPositionChanged != null) {
-      _onPositionChangedCallbacks[playerId] ??= [];
-      _onPositionChangedCallbacks[playerId]!.add(onPositionChanged);
+      _addCallbackWithLimit(_onPositionChangedCallbacks, playerId, onPositionChanged);
     }
     if (onWaveformData != null) {
-      _onWaveformDataCallbacks[playerId] ??= [];
-      _onWaveformDataCallbacks[playerId]!.add(onWaveformData);
+      _addCallbackWithLimit(_onWaveformDataCallbacks, playerId, onWaveformData);
 
       // Enviar datos actuales si existen
       final audioInfo = _activeAudios[playerId];
@@ -511,6 +623,13 @@ class GlobalAudioPlayerManager {
         onWaveformData(audioInfo!.waveformData.value!);
       }
     }
+    
+    // Log estadísticas de callbacks para debugging
+    final stats = getCallbackStats(playerId);
+    log('GlobalAudioPlayerManager: Callback stats for $playerId: $stats');
+    
+    // Iniciar limpieza automática de callbacks huérfanos si es necesario
+    _scheduleOrphanedCallbackCleanup();
   }
 
   /// Elimina callbacks para un audio específico
@@ -565,10 +684,21 @@ class GlobalAudioPlayerManager {
     log('GlobalAudioPlayerManager: Disposing all resources');
     stopAll();
     
+    // Cancelar timer de limpieza
+    _cleanupTimer?.cancel();
+    _cleanupTimer = null;
+    
     // Limpiar todos los locks
     _preparingAudios.clear();
     _operationLocks.clear();
     _callbackLocks.clear();
+    
+    // Limpiar todos los callbacks
+    _onPlayCallbacks.clear();
+    _onPauseCallbacks.clear();
+    _onStopCallbacks.clear();
+    _onPositionChangedCallbacks.clear();
+    _onWaveformDataCallbacks.clear();
     
     _activeAudiosController.close();
   }
