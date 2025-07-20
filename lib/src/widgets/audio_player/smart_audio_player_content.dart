@@ -13,6 +13,7 @@ class AudioPlayerContent extends StatelessWidget {
   final bool useBubbleStyle;
   final EdgeInsetsGeometry? padding;
   final bool isPlaying;
+  final bool isLoading;
   final Duration position;
   final Duration duration;
   final IconData playIcon;
@@ -38,6 +39,7 @@ class AudioPlayerContent extends StatelessWidget {
     required this.useBubbleStyle,
     this.padding,
     required this.isPlaying,
+    this.isLoading = false,
     required this.position,
     required this.duration,
     required this.playIcon,
@@ -91,6 +93,7 @@ class AudioPlayerContent extends StatelessWidget {
                     ],
                     AudioPlayPauseButton(
                       isPlaying: isPlaying,
+                      isLoading: isLoading,
                       playIcon: playIcon,
                       pauseIcon: pauseIcon,
                       color: color,

@@ -762,6 +762,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
       useBubbleStyle: widget.useBubbleStyle,
       padding: widget.padding,
       isPlaying: _isPlaying,
+      isLoading: _isLoading,
       position: _position,
       duration: _duration,
       playIcon: widget.playIcon,

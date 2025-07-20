@@ -526,6 +526,64 @@ void main() {
         expectedType: SmartAudioPlayerWidget,
       );
     });
+
+    testWidgets('should handle local file paths', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SmartAudioPlayerWidget(
+              audioSource: '/path/to/local/audio.mp3',
+              enableGlobal: false,
+            ),
+          ),
+        ),
+      );
+
+      // Should show the widget
+      expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
+    });
+
+    testWidgets('should show loading animation around play button', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SmartAudioPlayerWidget(
+              audioSource: 'https://example.com/slow-audio.mp3',
+              enableGlobal: false,
+            ),
+          ),
+        ),
+      );
+
+      // Should show the widget initially
+      expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
+
+      // Should show loading indicator around the button
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    testWidgets('should show loading animation for global audio player', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SmartAudioPlayerWidget(
+              audioSource: 'https://example.com/slow-audio.mp3',
+              enableGlobal: true,
+            ),
+          ),
+        ),
+      );
+
+      // Should show the widget initially
+      expect(find.byType(SmartAudioPlayerWidget), findsOneWidget);
+
+      // Should show loading indicator around the button
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
   });
 
   group('AudioPlayerWidget - Cache Management', () {
