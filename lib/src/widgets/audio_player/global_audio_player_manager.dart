@@ -542,6 +542,7 @@ class GlobalAudioPlayerManager {
             .preparePlayer(
               path: sourcePath,
               shouldExtractWaveform: shouldExtractWaveform,
+              noOfSamples: 200, // Más muestras para un waveform más detallado
             )
             .timeout(
               timeout,

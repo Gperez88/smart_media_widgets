@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:flutter/material.dart';
 
@@ -37,10 +39,31 @@ class SmartAudioWaveformWidget extends StatefulWidget {
   /// Waveform type (fitWidth or long)
   final WaveformType waveformType;
 
+  /// Wave thickness
+  final double waveThickness;
+
+  /// Spacing between wave elements
+  final double spacing;
+
+  /// Scale factor for waveform amplification
+  final double scaleFactor;
+
+  /// Whether to show seek line
+  final bool showSeekLine;
+
+  /// Seek line thickness
+  final double seekLineThickness;
+
+  /// Wave cap style (round, square, butt)
+  final StrokeCap waveCap;
+
+  /// Whether to show continuous waveform updates
+  final bool continuousWaveform;
+
   const SmartAudioWaveformWidget({
     super.key,
     required this.playerController,
-    this.height = 20,
+    this.height = 10,
     required this.color,
     required this.backgroundColor,
     required this.position,
@@ -49,6 +72,13 @@ class SmartAudioWaveformWidget extends StatefulWidget {
     this.width,
     this.enableGesture = true,
     this.waveformType = WaveformType.fitWidth,
+    this.waveThickness = 2.0,
+    this.spacing = 3.0,
+    this.scaleFactor = 200,
+    this.showSeekLine = true,
+    this.seekLineThickness = 3.0,
+    this.waveCap = StrokeCap.round,
+    this.continuousWaveform = true,
   });
 
   @override
@@ -58,6 +88,8 @@ class SmartAudioWaveformWidget extends StatefulWidget {
 
 class _SmartAudioWaveformWidgetState extends State<SmartAudioWaveformWidget> {
   bool _isInitialized = false;
+  bool _hasWaveformData = false;
+  StreamSubscription? _waveformDataSubscription;
 
   @override
   void initState() {
@@ -73,11 +105,46 @@ class _SmartAudioWaveformWidgetState extends State<SmartAudioWaveformWidget> {
     }
   }
 
+  @override
+  void dispose() {
+    _waveformDataSubscription?.cancel();
+    super.dispose();
+  }
+
   void _checkInitialization() {
-    // Check if the player controller is initialized
     setState(() {
-      _isInitialized = widget.playerController.playerState != PlayerState.stopped;
+      _isInitialized =
+          widget.playerController.playerState == PlayerState.initialized ||
+          widget.playerController.playerState == PlayerState.playing ||
+          widget.playerController.playerState == PlayerState.paused;
     });
+
+    // Escuchar datos del waveform
+    _setupWaveformDataListener();
+
+    // Intentar extraer waveform si está inicializado
+    if (_isInitialized) {
+      _tryExtractWaveform();
+    }
+  }
+
+  void _tryExtractWaveform() async {
+    // No necesitamos extraer manualmente si ya se está haciendo en preparePlayer
+  }
+
+  void _setupWaveformDataListener() {
+    _waveformDataSubscription?.cancel();
+
+    _waveformDataSubscription = widget
+        .playerController
+        .onCurrentExtractedWaveformData
+        .listen((waveformData) {
+          if (mounted && waveformData.isNotEmpty) {
+            setState(() {
+              _hasWaveformData = true;
+            });
+          }
+        });
   }
 
   void _onWaveformTap(double position) {
@@ -102,7 +169,7 @@ class _SmartAudioWaveformWidgetState extends State<SmartAudioWaveformWidget> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(4),
-        child: _isInitialized
+        child: (_isInitialized && _hasWaveformData)
             ? _buildWaveform()
             : _buildPlaceholder(),
       ),
@@ -110,37 +177,22 @@ class _SmartAudioWaveformWidgetState extends State<SmartAudioWaveformWidget> {
   }
 
   Widget _buildWaveform() {
-    return GestureDetector(
-      onTapDown: widget.enableGesture
-          ? (details) {
-              final RenderBox renderBox = context.findRenderObject() as RenderBox;
-              final localPosition = renderBox.globalToLocal(details.globalPosition);
-              final tapPosition = localPosition.dx / renderBox.size.width;
-              _onWaveformTap(tapPosition.clamp(0.0, 1.0));
-            }
-          : null,
-      onPanUpdate: widget.enableGesture
-          ? (details) {
-              final RenderBox renderBox = context.findRenderObject() as RenderBox;
-              final localPosition = renderBox.globalToLocal(details.globalPosition);
-              final dragPosition = localPosition.dx / renderBox.size.width;
-              _onWaveformTap(dragPosition.clamp(0.0, 1.0));
-            }
-          : null,
-      child: AudioFileWaveforms(
-        playerController: widget.playerController,
-        size: Size(widget.width ?? double.infinity, widget.height),
-        waveformType: widget.waveformType,
-        playerWaveStyle: PlayerWaveStyle(
-          fixedWaveColor: widget.color,
-          liveWaveColor: widget.color.withValues(alpha: 0.8),
-          spacing: 2,
-          showSeekLine: true,
-          seekLineColor: widget.color,
-          seekLineThickness: 2,
-          waveThickness: 2,
-          scaleFactor: 150,
-        ),
+    return AudioFileWaveforms(
+      playerController: widget.playerController,
+      size: Size.fromHeight(widget.height),
+      waveformType: WaveformType.fitWidth,
+      playerWaveStyle: PlayerWaveStyle(
+        fixedWaveColor: widget.backgroundColor,
+        liveWaveColor: widget.color,
+        spacing: widget.spacing,
+        showSeekLine: widget.showSeekLine,
+        seekLineColor: widget.color,
+        seekLineThickness: widget.seekLineThickness,
+        waveThickness: widget.waveThickness,
+        scaleFactor: widget.scaleFactor,
+        waveCap: widget.waveCap,
+        showTop: true,
+        showBottom: true,
       ),
     );
   }
@@ -154,16 +206,22 @@ class _SmartAudioWaveformWidgetState extends State<SmartAudioWaveformWidget> {
     return GestureDetector(
       onTapDown: widget.enableGesture
           ? (details) {
-              final RenderBox renderBox = context.findRenderObject() as RenderBox;
-              final localPosition = renderBox.globalToLocal(details.globalPosition);
+              final RenderBox renderBox =
+                  context.findRenderObject() as RenderBox;
+              final localPosition = renderBox.globalToLocal(
+                details.globalPosition,
+              );
               final tapPosition = localPosition.dx / renderBox.size.width;
               _onWaveformTap(tapPosition.clamp(0.0, 1.0));
             }
           : null,
       onPanUpdate: widget.enableGesture
           ? (details) {
-              final RenderBox renderBox = context.findRenderObject() as RenderBox;
-              final localPosition = renderBox.globalToLocal(details.globalPosition);
+              final RenderBox renderBox =
+                  context.findRenderObject() as RenderBox;
+              final localPosition = renderBox.globalToLocal(
+                details.globalPosition,
+              );
               final dragPosition = localPosition.dx / renderBox.size.width;
               _onWaveformTap(dragPosition.clamp(0.0, 1.0));
             }

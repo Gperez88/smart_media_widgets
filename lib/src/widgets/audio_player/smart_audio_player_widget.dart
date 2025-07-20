@@ -102,6 +102,9 @@ class SmartAudioPlayerWidget extends StatefulWidget {
   /// Optional title for the audio (shown in global player)
   final String? title;
 
+  /// Height of the waveform progress bar
+  final double? waveformHeight;
+
   const SmartAudioPlayerWidget({
     super.key,
     required this.audioSource,
@@ -131,6 +134,7 @@ class SmartAudioPlayerWidget extends StatefulWidget {
     this.rightWidget,
     this.enableGlobal = false,
     this.title,
+    this.waveformHeight,
   });
 
   @override
@@ -366,7 +370,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
                 title: widget.title,
                 playerId: _playerId,
                 isGlobal: widget.enableGlobal,
-                shouldExtractWaveform: false,
+                shouldExtractWaveform: true,
               )
               .timeout(
                 const Duration(seconds: 10),
@@ -420,7 +424,8 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
         // Lógica original para reproductores locales
         await _effectivePlayerController.preparePlayer(
           path: _audioPath!,
-          shouldExtractWaveform: false,
+          shouldExtractWaveform: true,
+          noOfSamples: 200, // Más muestras para un waveform más detallado
         );
 
         if (_isDisposed) return;
@@ -743,6 +748,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
       rightWidget: widget.rightWidget,
       playerController: _effectivePlayerController,
       onSeek: _onSeek,
+      waveformHeight: widget.waveformHeight,
     );
   }
 }

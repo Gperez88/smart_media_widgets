@@ -31,6 +31,7 @@ class AudioPlayerContent extends StatelessWidget {
   final Widget? rightWidget;
   final PlayerController? playerController;
   final Function(Duration)? onSeek;
+  final double? waveformHeight;
 
   const AudioPlayerContent({
     super.key,
@@ -59,6 +60,7 @@ class AudioPlayerContent extends StatelessWidget {
     this.rightWidget,
     this.playerController,
     this.onSeek,
+    this.waveformHeight,
   });
 
   @override
@@ -142,12 +144,18 @@ class AudioPlayerContent extends StatelessWidget {
 
     return SmartAudioWaveformWidget(
       playerController: playerController!,
-      height: 16,
-      color: Colors.white.withValues(alpha: 0.8),
-      backgroundColor: Colors.white.withValues(alpha: 0.3),
+      height: waveformHeight ?? 8,
+      color: Colors.white.withValues(alpha: 0.9),
+      backgroundColor: Colors.white.withValues(alpha: 0.2),
       position: position,
       duration: duration,
       onSeek: onSeek,
+      waveThickness: 2.0, // Barras gruesas pero válidas
+      spacing: 3.0, // Debe ser mayor que waveThickness
+      scaleFactor: 220, // Mayor amplificación
+      showSeekLine: true,
+      seekLineThickness: 2.0,
+      waveCap: StrokeCap.round, // Extremos redondeados para barras suaves
     );
   }
 
