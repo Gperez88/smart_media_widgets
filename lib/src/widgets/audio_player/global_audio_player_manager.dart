@@ -51,6 +51,13 @@ class GlobalAudioPlayerManager {
 
   GlobalAudioPlayerManager._();
 
+  // Mutex para operaciones críticas
+  final Map<String, Completer<void>> _preparingAudios = {};
+  final Map<String, bool> _operationLocks = {};
+  
+  // Mutex para sincronización de callbacks
+  final Map<String, bool> _callbackLocks = {};
+
   // Mapa de audios activos por playerId
   final Map<String, GlobalAudioInfo> _activeAudios = {};
 
@@ -74,12 +81,91 @@ class GlobalAudioPlayerManager {
 
   /// Obtiene información de un audio específico
   GlobalAudioInfo? getAudioInfo(String playerId) {
+    // No devolver información si el audio está en preparación
+    if (isAudioPreparing(playerId)) {
+      return null;
+    }
     return _activeAudios[playerId];
   }
 
   /// Verifica si un audio está activo
   bool isAudioActive(String playerId) {
     return _activeAudios.containsKey(playerId);
+  }
+
+  /// Verifica si un audio está en proceso de preparación
+  bool isAudioPreparing(String playerId) {
+    return _preparingAudios.containsKey(playerId);
+  }
+
+  /// Adquiere un lock para operaciones críticas
+  Future<void> _acquireOperationLock(String playerId) async {
+    // Esperar si ya hay una operación en progreso
+    if (_preparingAudios.containsKey(playerId)) {
+      await _preparingAudios[playerId]!.future;
+    }
+
+    // Marcar como en preparación
+    _preparingAudios[playerId] = Completer<void>();
+    _operationLocks[playerId] = true;
+  }
+
+  /// Libera un lock para operaciones críticas
+  void _releaseOperationLock(String playerId) {
+    final completer = _preparingAudios.remove(playerId);
+    _operationLocks.remove(playerId);
+    
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+  }
+
+  /// Ejecuta callbacks de manera segura
+  void _safeExecuteCallbacks(String playerId, List<VoidCallback>? callbacks) {
+    if (callbacks == null || callbacks.isEmpty) return;
+    
+    // Evitar ejecución concurrente de callbacks para el mismo playerId
+    if (_callbackLocks[playerId] == true) {
+      log('GlobalAudioPlayerManager: Skipping callback execution, already in progress for: $playerId');
+      return;
+    }
+    
+    _callbackLocks[playerId] = true;
+    try {
+      for (final callback in List.from(callbacks)) {
+        try {
+          callback();
+        } catch (e) {
+          log('GlobalAudioPlayerManager: Error executing callback for $playerId: $e');
+        }
+      }
+    } finally {
+      _callbackLocks.remove(playerId);
+    }
+  }
+
+  /// Ejecuta callbacks con parámetros de manera segura
+  void _safeExecuteParameterCallbacks<T>(String playerId, List<Function(T)>? callbacks, T parameter) {
+    if (callbacks == null || callbacks.isEmpty) return;
+    
+    // Evitar ejecución concurrente de callbacks para el mismo playerId
+    if (_callbackLocks[playerId] == true) {
+      log('GlobalAudioPlayerManager: Skipping parameter callback execution, already in progress for: $playerId');
+      return;
+    }
+    
+    _callbackLocks[playerId] = true;
+    try {
+      for (final callback in List.from(callbacks)) {
+        try {
+          callback(parameter);
+        } catch (e) {
+          log('GlobalAudioPlayerManager: Error executing parameter callback for $playerId: $e');
+        }
+      }
+    } finally {
+      _callbackLocks.remove(playerId);
+    }
   }
 
   /// Prepara un nuevo audio para reproducción
@@ -94,30 +180,33 @@ class GlobalAudioPlayerManager {
       'GlobalAudioPlayerManager: prepareAudio called - audioSource: $audioSource, playerId: $playerId',
     );
 
-    // Si ya existe este audio, verificar si está listo
-    if (_activeAudios.containsKey(playerId)) {
-      log(
-        'GlobalAudioPlayerManager: Audio already exists for playerId: $playerId',
-      );
-
-      final existingAudio = _activeAudios[playerId]!;
-
-      // Si el audio source es diferente, reemplazar el audio existente
-      if (existingAudio.audioSource != audioSource) {
-        log(
-          'GlobalAudioPlayerManager: Audio source changed, replacing existing audio for playerId: $playerId',
-        );
-        await stop(playerId);
-      } else {
-        // El audio ya existe y tiene la misma fuente, no hacer nada
-        log(
-          'GlobalAudioPlayerManager: Audio already prepared with same source for playerId: $playerId',
-        );
-        return;
-      }
-    }
+    // Adquirir lock para operaciones críticas
+    await _acquireOperationLock(playerId);
 
     try {
+      // Si ya existe este audio, verificar si está listo
+      if (_activeAudios.containsKey(playerId)) {
+        log(
+          'GlobalAudioPlayerManager: Audio already exists for playerId: $playerId',
+        );
+
+        final existingAudio = _activeAudios[playerId]!;
+
+        // Si el audio source es diferente, reemplazar el audio existente
+        if (existingAudio.audioSource != audioSource) {
+          log(
+            'GlobalAudioPlayerManager: Audio source changed, replacing existing audio for playerId: $playerId',
+          );
+          await stop(playerId);
+        } else {
+          // El audio ya existe y tiene la misma fuente, no hacer nada
+          log(
+            'GlobalAudioPlayerManager: Audio already prepared with same source for playerId: $playerId',
+          );
+          return;
+        }
+      }
+
       log(
         'GlobalAudioPlayerManager: Creating new player controller for: $audioSource',
       );
@@ -150,7 +239,7 @@ class GlobalAudioPlayerManager {
       // Obtener la duración real del audio
       try {
         final actualDuration = await playerController.getDuration();
-        if (actualDuration != null) {
+        if (actualDuration > 0) {
           duration.value = Duration(milliseconds: actualDuration);
         }
       } catch (e) {
@@ -164,12 +253,7 @@ class GlobalAudioPlayerManager {
             position.value = newPosition;
 
             // Notificar callbacks
-            final callbacks = _onPositionChangedCallbacks[playerId];
-            if (callbacks != null) {
-              for (final callback in callbacks) {
-                callback(newPosition);
-              }
-            }
+            _safeExecuteParameterCallbacks(playerId, _onPositionChangedCallbacks[playerId], newPosition);
           });
 
       StreamSubscription? waveformSubscription;
@@ -179,12 +263,7 @@ class GlobalAudioPlayerManager {
               waveformData.value = data;
 
               // Notificar callbacks
-              final callbacks = _onWaveformDataCallbacks[playerId];
-              if (callbacks != null) {
-                for (final callback in callbacks) {
-                  callback(data);
-                }
-              }
+              _safeExecuteParameterCallbacks(playerId, _onWaveformDataCallbacks[playerId], data);
             });
       }
 
@@ -215,11 +294,20 @@ class GlobalAudioPlayerManager {
     } catch (e) {
       log('GlobalAudioPlayerManager: Error preparing audio: $e');
       rethrow;
+    } finally {
+      // Liberar lock siempre, incluso si hay errores
+      _releaseOperationLock(playerId);
     }
   }
 
   /// Inicia la reproducción de un audio específico
   Future<void> play(String playerId) async {
+    // Verificar si el audio está en preparación
+    if (isAudioPreparing(playerId)) {
+      log('GlobalAudioPlayerManager: Audio is still preparing for playerId: $playerId');
+      return;
+    }
+
     final audioInfo = _activeAudios[playerId];
     if (audioInfo == null) {
       log('GlobalAudioPlayerManager: Audio not found for playerId: $playerId');
@@ -237,12 +325,7 @@ class GlobalAudioPlayerManager {
         audioInfo.isPlaying.value = true;
 
         // Notificar callbacks
-        final callbacks = _onPlayCallbacks[playerId];
-        if (callbacks != null) {
-          for (final callback in callbacks) {
-            callback();
-          }
-        }
+        _safeExecuteCallbacks(playerId, _onPlayCallbacks[playerId]);
 
         log(
           'GlobalAudioPlayerManager: Started playback for playerId: $playerId (isGlobal: ${audioInfo.isGlobal})',
@@ -271,12 +354,7 @@ class GlobalAudioPlayerManager {
           otherAudioInfo.isPlaying.value = false;
 
           // Notificar callbacks de pausa
-          final callbacks = _onPauseCallbacks[otherPlayerId];
-          if (callbacks != null) {
-            for (final callback in callbacks) {
-              callback();
-            }
-          }
+          _safeExecuteCallbacks(otherPlayerId, _onPauseCallbacks[otherPlayerId]);
 
           log(
             'GlobalAudioPlayerManager: Paused other global audio: $otherPlayerId',
@@ -292,6 +370,12 @@ class GlobalAudioPlayerManager {
 
   /// Pausa la reproducción de un audio específico
   Future<void> pause(String playerId) async {
+    // Verificar si el audio está en preparación
+    if (isAudioPreparing(playerId)) {
+      log('GlobalAudioPlayerManager: Audio is still preparing for playerId: $playerId');
+      return;
+    }
+
     final audioInfo = _activeAudios[playerId];
     if (audioInfo == null) {
       log('GlobalAudioPlayerManager: Audio not found for playerId: $playerId');
@@ -304,12 +388,7 @@ class GlobalAudioPlayerManager {
         audioInfo.isPlaying.value = false;
 
         // Notificar callbacks
-        final callbacks = _onPauseCallbacks[playerId];
-        if (callbacks != null) {
-          for (final callback in callbacks) {
-            callback();
-          }
-        }
+        _safeExecuteCallbacks(playerId, _onPauseCallbacks[playerId]);
       } catch (e) {
         log(
           'GlobalAudioPlayerManager: Error pausing playback for playerId: $playerId - $e',
@@ -321,6 +400,13 @@ class GlobalAudioPlayerManager {
 
   /// Detiene y elimina un audio específico
   Future<void> stop(String playerId) async {
+    // Verificar si el audio está en preparación
+    if (isAudioPreparing(playerId)) {
+      log('GlobalAudioPlayerManager: Audio is still preparing, waiting to stop for playerId: $playerId');
+      // Esperar a que termine la preparación antes de detener
+      await _preparingAudios[playerId]?.future;
+    }
+
     final audioInfo = _activeAudios[playerId];
     if (audioInfo == null) {
       log('GlobalAudioPlayerManager: Audio not found for playerId: $playerId');
@@ -333,12 +419,7 @@ class GlobalAudioPlayerManager {
       }
 
       // Notificar callbacks antes de eliminar
-      final callbacks = _onStopCallbacks[playerId];
-      if (callbacks != null) {
-        for (final callback in callbacks) {
-          callback();
-        }
-      }
+      _safeExecuteCallbacks(playerId, _onStopCallbacks[playerId]);
 
       // Limpiar recursos
       audioInfo.dispose();
@@ -369,6 +450,12 @@ class GlobalAudioPlayerManager {
 
   /// Busca una posición específica en un audio
   Future<void> seekTo(String playerId, Duration position) async {
+    // Verificar si el audio está en preparación
+    if (isAudioPreparing(playerId)) {
+      log('GlobalAudioPlayerManager: Audio is still preparing for playerId: $playerId');
+      return;
+    }
+
     final audioInfo = _activeAudios[playerId];
     if (audioInfo == null) {
       log('GlobalAudioPlayerManager: Audio not found for playerId: $playerId');
@@ -380,12 +467,7 @@ class GlobalAudioPlayerManager {
       audioInfo.position.value = position;
 
       // Notificar callbacks
-      final callbacks = _onPositionChangedCallbacks[playerId];
-      if (callbacks != null) {
-        for (final callback in callbacks) {
-          callback(position);
-        }
-      }
+      _safeExecuteParameterCallbacks(playerId, _onPositionChangedCallbacks[playerId], position);
     } catch (e) {
       log(
         'GlobalAudioPlayerManager: Error seeking for playerId: $playerId - $e',
@@ -464,6 +546,9 @@ class GlobalAudioPlayerManager {
     _onStopCallbacks.remove(playerId);
     _onPositionChangedCallbacks.remove(playerId);
     _onWaveformDataCallbacks.remove(playerId);
+    
+    // Limpiar locks de callbacks si existen
+    _callbackLocks.remove(playerId);
   }
 
   /// Detiene todos los audios activos
@@ -479,6 +564,12 @@ class GlobalAudioPlayerManager {
   void dispose() {
     log('GlobalAudioPlayerManager: Disposing all resources');
     stopAll();
+    
+    // Limpiar todos los locks
+    _preparingAudios.clear();
+    _operationLocks.clear();
+    _callbackLocks.clear();
+    
     _activeAudiosController.close();
   }
 
