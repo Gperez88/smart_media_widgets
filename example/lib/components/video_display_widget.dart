@@ -9,25 +9,25 @@ class VideoDisplayWidgetExample extends StatelessWidget {
       'url':
           'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
       'title': 'Big Buck Bunny',
-      'description': 'Video de demostración - Conejo animado',
+      'description': 'Demo video - Animated rabbit',
     },
     {
       'url':
           'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
       'title': 'Elephant\'s Dream',
-      'description': 'Video de demostración - Animación 3D',
+      'description': 'Demo video - 3D Animation',
     },
     {
       'url':
           'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
       'title': 'For Bigger Blazes',
-      'description': 'Video de demostración - Acción',
+      'description': 'Demo video - Action',
     },
     {
       'url':
           'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
       'title': 'Subaru Outback',
-      'description': 'Video de demostración - Automóvil',
+      'description': 'Demo video - Car',
     },
   ];
 
@@ -126,7 +126,7 @@ class VideoDisplayWidgetExample extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${_remoteVideos[1]['description']} - Inicia automáticamente',
+                  '${_remoteVideos[1]['description']} - Starts automatically',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 8),
@@ -162,7 +162,7 @@ class VideoDisplayWidgetExample extends StatelessWidget {
               border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
             ),
             child: const Text(
-              'Video con configuración de cache personalizada y controles avanzados.',
+              'Video with custom cache configuration and advanced controls.',
               style: TextStyle(fontSize: 12, color: Colors.green),
             ),
           ),
@@ -198,7 +198,7 @@ class VideoDisplayWidgetExample extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${_remoteVideos[2]['description']} - Cache personalizado de 100MB',
+                  '${_remoteVideos[2]['description']} - Custom cache of 100MB',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 8),
@@ -241,7 +241,7 @@ class VideoDisplayWidgetExample extends StatelessWidget {
               border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
             ),
             child: const Text(
-              'Reproductor más pequeño para espacios reducidos.',
+              'Smaller player for reduced spaces.',
               style: TextStyle(fontSize: 12, color: Colors.orange),
             ),
           ),
@@ -258,7 +258,7 @@ class VideoDisplayWidgetExample extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${_remoteVideos[3]['description']} - Formato compacto',
+                  '${_remoteVideos[3]['description']} - Compact format',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 8),
@@ -279,7 +279,7 @@ class VideoDisplayWidgetExample extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // Video con error forzado (URL inválida)
+          // Video with forced error (invalid URL)
           Padding(
             padding: const EdgeInsets.only(bottom: 20),
             child: Column(
@@ -293,7 +293,7 @@ class VideoDisplayWidgetExample extends StatelessWidget {
                 const Text('Demonstrates visual error handling.'),
                 const SizedBox(height: 8),
                 SmartVideoPlayerWidget(
-                  videoSource: 'https://url-invalida-404.com/video.mp4',
+                  videoSource: 'https://invalid-url-404.com/video.mp4',
                   width: double.infinity,
                   height: 160,
                   errorWidget: Container(
@@ -311,7 +311,7 @@ class VideoDisplayWidgetExample extends StatelessWidget {
             ),
           ),
 
-          // Video con overlay de ícono
+          // Video with icon overlay
           Padding(
             padding: const EdgeInsets.only(bottom: 20),
             child: Stack(
@@ -340,23 +340,23 @@ class VideoDisplayWidgetExample extends StatelessWidget {
             ),
           ),
 
-          // Video local (comentado si no hay asset)
+          // Local video (commented if no asset)
           /*
           Padding(
             padding: const EdgeInsets.only(bottom: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Video local', style: TextStyle(fontWeight: FontWeight.w500)),
+                const Text('Local video', style: TextStyle(fontWeight: FontWeight.w500)),
                 const SizedBox(height: 4),
-                const Text('Ejemplo de video desde asset local.'),
+                const Text('Example of video from local asset.'),
                 const SizedBox(height: 8),
                 SmartVideoPlayerWidget(
-                  videoSource: 'assets/videos/ejemplo.mp4',
+                  videoSource: 'assets/videos/example.mp4',
                   width: double.infinity,
                   height: 160,
-                  onVideoLoaded: () => debugPrint('Video local cargado!'),
-                  onVideoError: (err) => debugPrint('Error video local: $err'),
+                  onVideoLoaded: () => debugPrint('Local video loaded!'),
+                  onVideoError: (err) => debugPrint('Local video error: $err'),
                 ),
               ],
             ),

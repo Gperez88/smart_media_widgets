@@ -6,12 +6,8 @@ import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:flutter/material.dart';
 import 'package:smart_media_widgets/smart_media_widgets.dart';
 
-import '../../utils/cache_manager.dart';
-import '../../utils/media_utils.dart';
-import 'global_audio_player_manager.dart';
 import 'smart_audio_player_content.dart';
 import 'smart_audio_player_error.dart';
-import 'smart_audio_player_placeholder.dart';
 
 /// SmartAudioPlayerWidget
 ///
@@ -293,7 +289,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
 
       // Obtener la duración inicial si está disponible
       _effectivePlayerController.getDuration().then((duration) {
-        if (duration != null && mounted && !_isDisposed) {
+        if (mounted && !_isDisposed) {
           setState(() {
             _duration = Duration(milliseconds: duration);
           });
@@ -443,7 +439,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
                   _effectivePlayerController
                       .getDuration()
                       .then((duration) {
-                        if (duration != null && mounted && !_isDisposed) {
+                        if (mounted && !_isDisposed) {
                           setState(() {
                             _duration = Duration(milliseconds: duration);
                           });
@@ -465,7 +461,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
         _effectivePlayerController
             .getDuration()
             .then((duration) {
-              if (duration != null && mounted && !_isDisposed) {
+              if (mounted && !_isDisposed) {
                 setState(() {
                   _duration = Duration(milliseconds: duration);
                 });
@@ -529,18 +525,6 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
     } catch (e) {
       debugPrint('AudioPlayerWidget: Error resolving path: $e');
       throw Exception('Failed to resolve audio path: $e');
-    }
-  }
-
-  /// Download audio in background for future cache
-  Future<void> _downloadAudioInBackground(String audioUrl) async {
-    try {
-      // Download without blocking the UI
-      await CacheManager.cacheAudio(audioUrl);
-    } catch (e) {
-      // Ignore background download errors
-      // Does not affect current playback
-      debugPrint('Background audio download failed: $e');
     }
   }
 
@@ -653,7 +637,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
   Future<void> _updateDuration() async {
     try {
       final duration = await _effectivePlayerController.getDuration();
-      if (duration != null && mounted && !_isDisposed) {
+      if (mounted && !_isDisposed) {
         setState(() {
           _duration = Duration(milliseconds: duration);
         });
@@ -663,27 +647,6 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
       }
     } catch (e) {
       debugPrint('AudioPlayerWidget: Error updating duration: $e');
-    }
-  }
-
-  /// Prepare player with timeout
-  Future<void> _preparePlayerWithTimeout({required String path}) async {
-    try {
-      await _effectivePlayerController
-          .preparePlayer(path: path, shouldExtractWaveform: false)
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              debugPrint('AudioPlayerWidget: Player preparation timed out');
-              throw TimeoutException(
-                'Player preparation timeout',
-                const Duration(seconds: 10),
-              );
-            },
-          );
-    } catch (e) {
-      debugPrint('AudioPlayerWidget: Error during player preparation: $e');
-      rethrow;
     }
   }
 
@@ -725,20 +688,6 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
 
   @override
   Widget build(BuildContext context) {
-    // Identical build logic for both global and local players
-    if (_isLoading) {
-      return AudioPlayerPlaceholder(
-        width: widget.width,
-        height: widget.height,
-        margin: widget.margin,
-        borderRadius: widget.borderRadius,
-        backgroundColor: widget.backgroundColor,
-        color: widget.color,
-        placeholder: widget.placeholder,
-        showLoadingIndicator: widget.showLoadingIndicator,
-      );
-    }
-
     if (_hasError) {
       return AudioPlayerError(
         width: widget.width,
@@ -751,7 +700,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
       );
     }
 
-    // Both global and local players show content the same way
+    // Always show content, with loading state handled by the button
     return AudioPlayerContent(
       width: widget.width,
       height: widget.height,

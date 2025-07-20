@@ -87,7 +87,7 @@ class ImageDisplayWidgetExample extends StatelessWidget {
             ),
           ),
 
-          // Imagen con borde y sombra
+          // Image with border and shadow
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Container(
@@ -117,11 +117,11 @@ class ImageDisplayWidgetExample extends StatelessWidget {
             ),
           ),
 
-          // Imagen con error forzado (URL inválida)
+          // Image with forced error (invalid URL)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: SmartImageDisplayWidget(
-              imageSource: 'https://url-invalida-404.com/imagen.png',
+              imageSource: 'https://invalid-url-404.com/image.png',
               width: double.infinity,
               height: 120,
               borderRadius: BorderRadius.circular(12),
@@ -141,22 +141,22 @@ class ImageDisplayWidgetExample extends StatelessWidget {
             ),
           ),
 
-          // Imagen local (comentada si no hay asset)
+          // Local image (commented if no asset)
           /*
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: SmartImageDisplayWidget(
-              imageSource: 'assets/images/ejemplo.jpg',
+              imageSource: 'assets/images/example.jpg',
               width: double.infinity,
               height: 120,
               borderRadius: BorderRadius.circular(12),
-              onImageLoaded: () => debugPrint('Imagen local cargada!'),
-              onImageError: (err) => debugPrint('Error imagen local: $err'),
+              onImageLoaded: () => debugPrint('Local image loaded!'),
+              onImageError: (err) => debugPrint('Local image error: $err'),
             ),
           ),
           */
 
-          // Imagen con overlay de ícono
+          // Image with icon overlay
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Stack(

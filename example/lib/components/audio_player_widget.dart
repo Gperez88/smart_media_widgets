@@ -37,7 +37,7 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
             ),
             child: const Text(
-              'Estos reproductores usan el modo global. Al reproducir aparecerá un reproductor persistente arriba.',
+              'These players use global mode. When playing, a persistent player will appear at the top.',
               style: TextStyle(fontSize: 12, color: Colors.purple),
             ),
           ),
@@ -59,8 +59,8 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               showPosition: true,
               useBubbleStyle: true,
               enableGlobal: true,
-              title: 'Nombre del audio',
-              // Ejemplo: avatar circular a la izquierda
+              title: 'Audio name',
+              // Example: circular avatar on the left
               leftWidget: CircleAvatar(
                 radius: 28,
                 backgroundImage: NetworkImage(
@@ -86,8 +86,8 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               showPosition: true,
               useBubbleStyle: true,
               enableGlobal: true,
-              title: 'Mismo audio, diferente instancia',
-              // Ejemplo: icono de micrófono a la derecha
+              title: 'Same audio, different instance',
+              // Example: microphone icon on the right
               rightWidget: CircleAvatar(
                 radius: 28,
                 backgroundImage: NetworkImage(
@@ -113,7 +113,7 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
             ),
             child: const Text(
-              'Este reproductor funciona en modo local tradicional (sin reproductor global).',
+              'This player works in traditional local mode (without global player).',
               style: TextStyle(fontSize: 12, color: Colors.orange),
             ),
           ),
@@ -151,7 +151,7 @@ class AudioPlayerWidgetExample extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '🎯 Instrucciones de Prueba',
+                  '🎯 Test Instructions',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -160,10 +160,10 @@ class AudioPlayerWidgetExample extends StatelessWidget {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  '1. Reproduce uno de los audios globales (azul o verde) - aparecerá el reproductor global arriba\n'
-                  '2. Navega entre tabs para ver que el reproductor global persiste\n'
-                  '3. Controla el audio desde cualquier reproductor (local o global)\n'
-                  '4. Prueba el reproductor local (naranja) - funciona independientemente',
+                  '1. Play one of the global audios (blue or green) - the global player will appear at the top\n'
+                  '2. Navigate between tabs to see that the global player persists\n'
+                  '3. Control the audio from any player (local or global)\n'
+                  '4. Test the local player (orange) - works independently',
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],

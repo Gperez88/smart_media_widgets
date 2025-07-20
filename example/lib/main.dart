@@ -1,8 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:smart_media_widgets/smart_media_widgets.dart';
-import 'android_buffer_example.dart';
 
 import 'components/audio_player_widget.dart';
 import 'components/cache_config_widget.dart';
@@ -43,6 +39,7 @@ class _MyHomePageState extends State<MyHomePage> {
     const ImageDisplayWidgetExample(),
     const VideoDisplayWidgetExample(),
     const AudioPlayerWidgetExample(),
+    const CacheConfigWidget(),
   ];
 
   @override
@@ -68,6 +65,10 @@ class _MyHomePageState extends State<MyHomePage> {
             label: 'Videos',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.audiotrack), label: 'Audio'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Cache Config',
+          ),
         ],
       ),
     );
