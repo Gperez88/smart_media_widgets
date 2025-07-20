@@ -3,37 +3,54 @@
 ## Contexto
 Análisis y mejora de edge cases en `GlobalAudioPlayerManager` y `CacheManager` para aplicaciones de chat con uso intensivo, considerando múltiples eventos concurrentes y manejo dinámico de datos en caché.
 
-## Fase 1: GlobalAudioPlayerManager - Concurrencia y Race Conditions
+## Fase 1: GlobalAudioPlayerManager - Concurrencia y Race Conditions ✅ COMPLETADA
 
 ### 1.1 Problemas Identificados
 - **prepareAudio concurrente**: Múltiples llamadas simultáneas con el mismo `playerId` pueden crear controladores duplicados
 - **Estado inconsistente**: Ventana de tiempo entre líneas 98-118 donde el audio puede ser modificado por otro hilo
 - **Callbacks sin sincronización**: Callbacks se ejecutan sin protección contra modificaciones concurrentes
 
-### 1.2 Soluciones Propuestas
-- [ ] Implementar mutex/locks para operaciones críticas en `prepareAudio`
-- [ ] Agregar estado de "preparando" para evitar llamadas concurrentes
-- [ ] Sincronizar acceso a callbacks con locks de lectura/escritura
-- [ ] Validar estado antes de ejecutar operaciones
+### 1.2 Soluciones Implementadas
+- [x] Implementar mutex/locks para operaciones críticas en `prepareAudio`
+- [x] Agregar estado de "preparando" para evitar llamadas concurrentes
+- [x] Sincronizar acceso a callbacks con locks de lectura/escritura
+- [x] Validar estado antes de ejecutar operaciones
 
-### 1.3 Archivos a Modificar
+### 1.3 Archivos Modificados
 - `lib/src/widgets/audio_player/global_audio_player_manager.dart`
 
-## Fase 2: GlobalAudioPlayerManager - Gestión de Memoria y Recursos
+### 1.4 Cambios Implementados
+- Agregados `_preparingAudios`, `_operationLocks`, `_callbackLocks` para sincronización
+- Implementados métodos `_acquireOperationLock()` y `_releaseOperationLock()`
+- Creados métodos seguros `_safeExecuteCallbacks()` y `_safeExecuteParameterCallbacks()`
+- Agregadas validaciones de estado en `play()`, `pause()`, `stop()`, `seekTo()`
+- Mejorada limpieza de recursos en `dispose()` y `clearCallbacks()`
+- **Commit**: `60ccffa` - feat(audio): improve concurrency and race condition handling
+
+## Fase 2: GlobalAudioPlayerManager - Gestión de Memoria y Recursos ✅ COMPLETADA
 
 ### 2.1 Problemas Identificados
 - **Subscripciones no canceladas**: Memory leaks si `prepareAudio` falla después de crear subscripciones
 - **PlayerController órfanos**: Controladores no liberados si `stop()` falla
 - **Callbacks acumulativos**: Sin límite en acumulación de callbacks
 
-### 2.2 Soluciones Propuestas
-- [ ] Implementar cleanup automático en bloques try-catch
-- [ ] Agregar límite máximo de callbacks por playerId
-- [ ] Mejorar manejo de errores en `dispose()` de recursos
-- [ ] Implementar weak references para callbacks
+### 2.2 Soluciones Implementadas
+- [x] Implementar cleanup automático en bloques try-catch
+- [x] Agregar límite máximo de callbacks por playerId (max 10)
+- [x] Mejorar manejo de errores en `dispose()` de recursos
+- [x] Implementar sistema de limpieza de callbacks huérfanos
 
-### 2.3 Archivos a Modificar
+### 2.3 Archivos Modificados
 - `lib/src/widgets/audio_player/global_audio_player_manager.dart`
+
+### 2.4 Cambios Implementados
+- Mejorado `prepareAudio()` con cleanup automático de subscripciones en caso de error
+- Refactorizado `stop()` con garantía de limpieza usando `try-finally`
+- Implementado `dispose()` seguro en `GlobalAudioInfo` con manejo de errores
+- Agregado límite de 10 callbacks por `playerId` con sistema FIFO
+- Creado sistema de limpieza automática de callbacks huérfanos con timer periódico
+- Agregadas estadísticas de callbacks para monitoreo y debugging
+- **Commit**: `61cdaee` - feat(audio): improve memory management and resource cleanup
 
 ## Fase 3: GlobalAudioPlayerManager - Timeouts y Red
 
