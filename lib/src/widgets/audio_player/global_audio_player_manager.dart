@@ -1,8 +1,68 @@
 import 'dart:async';
 import 'dart:developer';
+import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:flutter/material.dart';
+
+/// Configuración para timeouts y reintentos de red
+class NetworkConfig {
+  /// Timeout base en segundos
+  final int baseTimeoutSeconds;
+  
+  /// Timeout adicional por MB de archivo estimado
+  final int timeoutPerMBSeconds;
+  
+  /// Número máximo de reintentos
+  final int maxRetries;
+  
+  /// Factor de backoff exponencial
+  final double backoffFactor;
+  
+  /// Delay inicial en milisegundos para el primer reintento
+  final int initialDelayMs;
+  
+  /// Timeout máximo absoluto en segundos
+  final int maxTimeoutSeconds;
+  
+  /// Detectar cambios de conectividad
+  final bool enableConnectivityDetection;
+
+  const NetworkConfig({
+    this.baseTimeoutSeconds = 10,
+    this.timeoutPerMBSeconds = 5,
+    this.maxRetries = 3,
+    this.backoffFactor = 2.0,
+    this.initialDelayMs = 1000,
+    this.maxTimeoutSeconds = 60,
+    this.enableConnectivityDetection = true,
+  });
+
+  /// Calcula timeout basado en tamaño estimado de archivo
+  Duration calculateTimeout({int? estimatedSizeMB}) {
+    final baseDuration = Duration(seconds: baseTimeoutSeconds);
+    if (estimatedSizeMB == null || estimatedSizeMB <= 0) {
+      return baseDuration;
+    }
+    
+    final additionalSeconds = (estimatedSizeMB * timeoutPerMBSeconds);
+    final totalSeconds = math.min(baseTimeoutSeconds + additionalSeconds, maxTimeoutSeconds);
+    
+    return Duration(seconds: totalSeconds);
+  }
+  
+  /// Calcula delay para reintento con backoff exponencial
+  Duration calculateRetryDelay(int attemptNumber) {
+    final delay = initialDelayMs * math.pow(backoffFactor, attemptNumber - 1);
+    return Duration(milliseconds: delay.round());
+  }
+
+  @override
+  String toString() {
+    return 'NetworkConfig(baseTimeout: ${baseTimeoutSeconds}s, maxRetries: $maxRetries, backoffFactor: $backoffFactor)';
+  }
+}
 
 /// Información de un audio global activo
 class GlobalAudioInfo {
@@ -80,6 +140,14 @@ class GlobalAudioPlayerManager {
   // Timer para limpieza automática de callbacks huérfanos
   Timer? _cleanupTimer;
 
+  // Configuración de red y timeouts
+  NetworkConfig _networkConfig = const NetworkConfig();
+
+  // Estado de conectividad estimado
+  bool _isConnected = true;
+  DateTime? _lastNetworkError;
+  int _consecutiveNetworkErrors = 0;
+
   // Mapa de audios activos por playerId
   final Map<String, GlobalAudioInfo> _activeAudios = {};
 
@@ -118,6 +186,144 @@ class GlobalAudioPlayerManager {
   /// Verifica si un audio está en proceso de preparación
   bool isAudioPreparing(String playerId) {
     return _preparingAudios.containsKey(playerId);
+  }
+
+  /// Actualiza la configuración de red
+  void updateNetworkConfig(NetworkConfig config) {
+    _networkConfig = config;
+    log('GlobalAudioPlayerManager: Updated network config: $config');
+  }
+
+  /// Obtiene la configuración de red actual
+  NetworkConfig get networkConfig => _networkConfig;
+
+  /// Indica si hay conectividad estimada
+  bool get isConnected => _isConnected;
+
+  /// Número de errores de red consecutivos
+  int get consecutiveNetworkErrors => _consecutiveNetworkErrors;
+
+  /// Última vez que se detectó un error de red
+  DateTime? get lastNetworkError => _lastNetworkError;
+
+  /// Registra un error de red para actualizar estado de conectividad
+  void _recordNetworkError(dynamic error) {
+    if (!_networkConfig.enableConnectivityDetection) return;
+
+    _lastNetworkError = DateTime.now();
+    _consecutiveNetworkErrors++;
+    
+    // Considerar desconectado después de 3 errores consecutivos
+    if (_consecutiveNetworkErrors >= 3) {
+      _isConnected = false;
+      log('GlobalAudioPlayerManager: Network connectivity lost ($_consecutiveNetworkErrors consecutive errors)');
+    }
+    
+    log('GlobalAudioPlayerManager: Network error recorded: $error (consecutive: $_consecutiveNetworkErrors)');
+    
+    // Adaptar configuración automáticamente
+    adaptNetworkConfig();
+  }
+
+  /// Registra recuperación de conectividad
+  void _recordNetworkRecovery() {
+    if (!_networkConfig.enableConnectivityDetection) return;
+
+    if (!_isConnected || _consecutiveNetworkErrors > 0) {
+      _isConnected = true;
+      _consecutiveNetworkErrors = 0;
+      _lastNetworkError = null;
+      log('GlobalAudioPlayerManager: Network connectivity recovered');
+      
+      // Adaptar configuración automáticamente tras recuperación
+      adaptNetworkConfig();
+    }
+  }
+
+  /// Verifica si un error es relacionado con red
+  bool _isNetworkError(dynamic error) {
+    if (error is TimeoutException) return true;
+    if (error is SocketException) return true;
+    
+    final errorString = error.toString().toLowerCase();
+    return errorString.contains('network') ||
+           errorString.contains('connection') ||
+           errorString.contains('timeout') ||
+           errorString.contains('unreachable') ||
+           errorString.contains('dns');
+  }
+
+  /// Adapta automáticamente la configuración de red basada en condiciones actuales
+  void adaptNetworkConfig() {
+    if (!_networkConfig.enableConnectivityDetection) return;
+
+    final now = DateTime.now();
+    final hasRecentErrors = _lastNetworkError != null && 
+                           now.difference(_lastNetworkError!).inMinutes < 5;
+
+    NetworkConfig newConfig;
+
+    if (!_isConnected || _consecutiveNetworkErrors >= 3) {
+      // Red inestable: configuración conservadora
+      newConfig = NetworkConfig(
+        baseTimeoutSeconds: _networkConfig.baseTimeoutSeconds * 2,
+        timeoutPerMBSeconds: _networkConfig.timeoutPerMBSeconds * 2,
+        maxRetries: math.max(_networkConfig.maxRetries, 5),
+        backoffFactor: math.max(_networkConfig.backoffFactor, 3.0),
+        initialDelayMs: _networkConfig.initialDelayMs * 2,
+        maxTimeoutSeconds: math.min(_networkConfig.maxTimeoutSeconds * 2, 120),
+        enableConnectivityDetection: _networkConfig.enableConnectivityDetection,
+      );
+      log('GlobalAudioPlayerManager: Adapted to unstable network configuration');
+      
+    } else if (hasRecentErrors) {
+      // Red con errores recientes: configuración intermedia
+      newConfig = NetworkConfig(
+        baseTimeoutSeconds: (_networkConfig.baseTimeoutSeconds * 1.5).round(),
+        timeoutPerMBSeconds: (_networkConfig.timeoutPerMBSeconds * 1.5).round(),
+        maxRetries: math.max(_networkConfig.maxRetries, 4),
+        backoffFactor: math.max(_networkConfig.backoffFactor, 2.5),
+        initialDelayMs: (_networkConfig.initialDelayMs * 1.5).round(),
+        maxTimeoutSeconds: _networkConfig.maxTimeoutSeconds,
+        enableConnectivityDetection: _networkConfig.enableConnectivityDetection,
+      );
+      log('GlobalAudioPlayerManager: Adapted to moderate network conditions');
+      
+    } else {
+      // Red estable: usar configuración original o optimizada
+      const baseConfig = NetworkConfig();
+      newConfig = NetworkConfig(
+        baseTimeoutSeconds: math.min(_networkConfig.baseTimeoutSeconds, baseConfig.baseTimeoutSeconds),
+        timeoutPerMBSeconds: math.min(_networkConfig.timeoutPerMBSeconds, baseConfig.timeoutPerMBSeconds),
+        maxRetries: math.min(_networkConfig.maxRetries, baseConfig.maxRetries),
+        backoffFactor: math.min(_networkConfig.backoffFactor, baseConfig.backoffFactor),
+        initialDelayMs: math.min(_networkConfig.initialDelayMs, baseConfig.initialDelayMs),
+        maxTimeoutSeconds: _networkConfig.maxTimeoutSeconds,
+        enableConnectivityDetection: _networkConfig.enableConnectivityDetection,
+      );
+      log('GlobalAudioPlayerManager: Adapted to stable network configuration');
+    }
+
+    if (newConfig.toString() != _networkConfig.toString()) {
+      _networkConfig = newConfig;
+      log('GlobalAudioPlayerManager: Network config adapted: $newConfig');
+    }
+  }
+
+  /// Obtiene estadísticas de red para monitoreo
+  Map<String, dynamic> getNetworkStats() {
+    final now = DateTime.now();
+    final minutesSinceLastError = _lastNetworkError != null 
+        ? now.difference(_lastNetworkError!).inMinutes 
+        : null;
+
+    return {
+      'isConnected': _isConnected,
+      'consecutiveNetworkErrors': _consecutiveNetworkErrors,
+      'lastNetworkError': _lastNetworkError?.toIso8601String(),
+      'minutesSinceLastError': minutesSinceLastError,
+      'currentConfig': _networkConfig.toString(),
+    };
   }
 
   /// Adquiere un lock para operaciones críticas
@@ -250,6 +456,68 @@ class GlobalAudioPlayerManager {
     }
   }
 
+  /// Prepara un PlayerController con reintentos y timeout adaptativo
+  Future<void> _preparePlayerWithRetries({
+    required PlayerController playerController,
+    required String audioSource,
+    required bool shouldExtractWaveform,
+    int? estimatedSizeMB,
+  }) async {
+    final timeout = _networkConfig.calculateTimeout(estimatedSizeMB: estimatedSizeMB);
+    
+    for (int attempt = 1; attempt <= _networkConfig.maxRetries + 1; attempt++) {
+      try {
+        log('GlobalAudioPlayerManager: Preparing audio attempt $attempt/${_networkConfig.maxRetries + 1} for: $audioSource (timeout: ${timeout.inSeconds}s)');
+        
+        await playerController
+            .preparePlayer(
+              path: audioSource,
+              shouldExtractWaveform: shouldExtractWaveform,
+            )
+            .timeout(
+              timeout,
+              onTimeout: () {
+                throw TimeoutException(
+                  'Audio preparation timeout after ${timeout.inSeconds}s',
+                  timeout,
+                );
+              },
+            );
+        
+        // Si llegamos aquí, la preparación fue exitosa
+        log('GlobalAudioPlayerManager: Audio prepared successfully on attempt $attempt for: $audioSource');
+        _recordNetworkRecovery();
+        return;
+        
+      } catch (e) {
+        final isLastAttempt = attempt > _networkConfig.maxRetries;
+        final isNetworkRelated = _isNetworkError(e);
+        
+        if (isNetworkRelated) {
+          _recordNetworkError(e);
+        }
+        
+        if (isLastAttempt) {
+          log('GlobalAudioPlayerManager: All attempts failed for: $audioSource. Last error: $e');
+          rethrow;
+        }
+        
+        // Calcular delay para el siguiente intento
+        final delay = _networkConfig.calculateRetryDelay(attempt);
+        
+        // Si hay problemas de conectividad, usar delay más largo
+        final adjustedDelay = isNetworkRelated && !_isConnected 
+            ? Duration(milliseconds: (delay.inMilliseconds * 2).round())
+            : delay;
+            
+        log('GlobalAudioPlayerManager: Attempt $attempt failed for: $audioSource. Retrying in ${adjustedDelay.inMilliseconds}ms. Error: $e');
+        
+        // Esperar antes del siguiente intento
+        await Future.delayed(adjustedDelay);
+      }
+    }
+  }
+
   /// Prepara un nuevo audio para reproducción
   Future<void> prepareAudio(
     String audioSource, {
@@ -299,21 +567,13 @@ class GlobalAudioPlayerManager {
       StreamSubscription? waveformSubscription;
 
       try {
-        // Preparar el audio con timeout
-        await playerController
-            .preparePlayer(
-              path: audioSource,
-              shouldExtractWaveform: shouldExtractWaveform,
-            )
-            .timeout(
-              const Duration(seconds: 10),
-              onTimeout: () {
-                throw TimeoutException(
-                  'Audio preparation timeout',
-                  const Duration(seconds: 10),
-                );
-              },
-            );
+        // Preparar el audio con reintentos y timeout adaptativo
+        await _preparePlayerWithRetries(
+          playerController: playerController,
+          audioSource: audioSource,
+          shouldExtractWaveform: shouldExtractWaveform,
+          estimatedSizeMB: null, // TODO: Implementar estimación de tamaño
+        );
 
         // Crear notifiers para este audio
         final isPlaying = ValueNotifier<bool>(false);
