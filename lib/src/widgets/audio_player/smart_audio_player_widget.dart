@@ -425,7 +425,7 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
         await _effectivePlayerController.preparePlayer(
           path: _audioPath!,
           shouldExtractWaveform: true,
-          noOfSamples: 200, // Más muestras para un waveform más detallado
+          noOfSamples: 200,
         );
 
         if (_isDisposed) return;

@@ -115,7 +115,7 @@ class AudioPlayerContent extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildWaveformSection(),
+                          _buildProgressSection(),
                           if (showDuration || showPosition) ...[
                             const SizedBox(height: 4),
                             _buildTimeDisplay(),
@@ -137,45 +137,14 @@ class AudioPlayerContent extends StatelessWidget {
     );
   }
 
-  Widget _buildWaveformSection() {
-    if (playerController == null) {
-      return _buildFallbackProgressBar();
-    }
-
+  Widget _buildProgressSection() {
     return SmartAudioWaveformWidget(
-      playerController: playerController!,
-      height: waveformHeight ?? 8,
+      height: waveformHeight ?? 10,
       color: Colors.white.withValues(alpha: 0.9),
       backgroundColor: Colors.white.withValues(alpha: 0.2),
       position: position,
       duration: duration,
       onSeek: onSeek,
-      waveThickness: 2.0, // Barras gruesas pero válidas
-      spacing: 3.0, // Debe ser mayor que waveThickness
-      scaleFactor: 220, // Mayor amplificación
-      showSeekLine: true,
-      seekLineThickness: 2.0,
-      waveCap: StrokeCap.round, // Extremos redondeados para barras suaves
-    );
-  }
-
-  Widget _buildFallbackProgressBar() {
-    final progress = duration.inMilliseconds > 0
-        ? position.inMilliseconds / duration.inMilliseconds
-        : 0.0;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        LinearProgressIndicator(
-          value: progress.clamp(0.0, 1.0),
-          backgroundColor: Colors.white.withValues(alpha: 0.3),
-          valueColor: AlwaysStoppedAnimation<Color>(
-            Colors.white.withValues(alpha: 0.8),
-          ),
-          minHeight: 4,
-        ),
-      ],
     );
   }
 
