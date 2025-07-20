@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:developer';
+import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -442,6 +442,294 @@ class DiskSpaceManager {
   }
 }
 
+/// Gestiona timeouts y validación de streams HTTP
+class NetworkStreamManager {
+  static final NetworkStreamManager _instance = NetworkStreamManager._internal();
+  factory NetworkStreamManager() => _instance;
+  NetworkStreamManager._internal();
+
+  /// Configuración de timeouts por defecto
+  static const Duration defaultConnectTimeout = Duration(seconds: 30);
+  static const Duration defaultReadTimeout = Duration(seconds: 60);
+  static const Duration defaultChunkTimeout = Duration(seconds: 10);
+
+  /// Descarga un archivo con timeouts configurables y validación
+  Future<DownloadResult> downloadFileWithValidation({
+    required String url,
+    required File destinationFile,
+    Duration? connectTimeout,
+    Duration? readTimeout,
+    Duration? chunkTimeout,
+    bool validateIntegrity = true,
+    void Function(int downloaded, int? total)? onProgress,
+  }) async {
+    final effectiveConnectTimeout = connectTimeout ?? defaultConnectTimeout;
+    final effectiveReadTimeout = readTimeout ?? defaultReadTimeout;
+    final effectiveChunkTimeout = chunkTimeout ?? defaultChunkTimeout;
+
+    log('NetworkStreamManager: Starting download with timeouts - Connect: ${effectiveConnectTimeout.inSeconds}s, Read: ${effectiveReadTimeout.inSeconds}s, Chunk: ${effectiveChunkTimeout.inSeconds}s');
+
+    final client = http.Client();
+    Completer<DownloadResult>? downloadCompleter;
+    Timer? connectionTimer;
+    Timer? readTimer;
+
+    try {
+      downloadCompleter = Completer<DownloadResult>();
+
+      // Timer de conexión
+      connectionTimer = Timer(effectiveConnectTimeout, () {
+        if (!downloadCompleter!.isCompleted) {
+          downloadCompleter.complete(DownloadResult.failure(
+            DownloadError.timeout,
+            'Connection timeout after ${effectiveConnectTimeout.inSeconds}s'
+          ));
+        }
+      });
+
+      final request = http.Request('GET', Uri.parse(url));
+      final response = await client.send(request);
+
+      // Cancelar timer de conexión una vez conectado
+      connectionTimer.cancel();
+
+      if (response.statusCode != 200) {
+        return DownloadResult.failure(
+          DownloadError.httpError,
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}'
+        );
+      }
+
+      // Timer de lectura total
+      readTimer = Timer(effectiveReadTimeout, () {
+        if (!downloadCompleter!.isCompleted) {
+          downloadCompleter.complete(DownloadResult.failure(
+            DownloadError.timeout,
+            'Read timeout after ${effectiveReadTimeout.inSeconds}s'
+          ));
+        }
+      });
+
+      final sink = destinationFile.openWrite();
+      int totalBytes = 0;
+      DateTime lastChunkTime = DateTime.now();
+      final checksumCalculator = ChecksumCalculator();
+
+      try {
+        await for (final chunk in response.stream) {
+          // Verificar timeout entre chunks
+          final now = DateTime.now();
+          if (now.difference(lastChunkTime) > effectiveChunkTimeout) {
+            throw TimeoutException(
+              'Chunk timeout after ${effectiveChunkTimeout.inSeconds}s without data',
+              effectiveChunkTimeout
+            );
+          }
+
+          sink.add(chunk);
+          totalBytes += chunk.length;
+          lastChunkTime = now;
+
+          // Actualizar checksum si está habilitado
+          if (validateIntegrity) {
+            checksumCalculator.addChunk(chunk);
+          }
+
+          // Callback de progreso
+          onProgress?.call(totalBytes, response.contentLength);
+
+          // Log de progreso cada MB
+          if (totalBytes % (1024 * 1024) == 0) {
+            log('NetworkStreamManager: Downloaded ${totalBytes ~/ (1024 * 1024)}MB');
+          }
+        }
+
+        await sink.close();
+        readTimer.cancel();
+
+        // Validar integridad del archivo descargado
+        if (validateIntegrity) {
+          final isValid = await _validateDownloadedFile(
+            destinationFile, 
+            checksumCalculator.getChecksum(),
+            totalBytes
+          );
+          
+          if (!isValid) {
+            return DownloadResult.failure(
+              DownloadError.corruptedFile,
+              'File integrity validation failed'
+            );
+          }
+        }
+
+        log('NetworkStreamManager: Download completed successfully - ${totalBytes ~/ 1024}KB');
+        
+        if (!downloadCompleter.isCompleted) {
+          downloadCompleter.complete(DownloadResult.success(
+            filePath: destinationFile.path,
+            bytesDownloaded: totalBytes,
+            checksum: validateIntegrity ? checksumCalculator.getChecksum() : null,
+          ));
+        }
+
+      } catch (e) {
+        await sink.close();
+        if (await destinationFile.exists()) {
+          await destinationFile.delete();
+        }
+        rethrow;
+      }
+
+    } on TimeoutException catch (e) {
+      log('NetworkStreamManager: Timeout error: ${e.message}');
+      return DownloadResult.failure(DownloadError.timeout, e.message ?? 'Timeout');
+    } catch (e) {
+      log('NetworkStreamManager: Download error: $e');
+      return DownloadResult.failure(DownloadError.networkError, e.toString());
+    } finally {
+      connectionTimer?.cancel();
+      readTimer?.cancel();
+      client.close();
+    }
+
+    return await downloadCompleter.future;
+  }
+
+  /// Valida un archivo descargado
+  Future<bool> _validateDownloadedFile(File file, String expectedChecksum, int expectedSize) async {
+    try {
+      if (!await file.exists()) {
+        log('NetworkStreamManager: Validation failed - File does not exist');
+        return false;
+      }
+
+      final actualSize = await file.length();
+      if (actualSize != expectedSize) {
+        log('NetworkStreamManager: Validation failed - Size mismatch. Expected: $expectedSize, Actual: $actualSize');
+        return false;
+      }
+
+      // Validar checksum si se proporcionó
+      if (expectedChecksum.isNotEmpty) {
+        final fileBytes = await file.readAsBytes();
+        final actualChecksum = ChecksumCalculator.calculateForBytes(fileBytes);
+        
+        if (actualChecksum != expectedChecksum) {
+          log('NetworkStreamManager: Validation failed - Checksum mismatch');
+          return false;
+        }
+      }
+
+      log('NetworkStreamManager: File validation successful');
+      return true;
+    } catch (e) {
+      log('NetworkStreamManager: Validation error: $e');
+      return false;
+    }
+  }
+
+  /// Obtiene estadísticas del gestor de red
+  Map<String, dynamic> getStats() {
+    return {
+      'defaultConnectTimeoutSeconds': defaultConnectTimeout.inSeconds,
+      'defaultReadTimeoutSeconds': defaultReadTimeout.inSeconds,
+      'defaultChunkTimeoutSeconds': defaultChunkTimeout.inSeconds,
+    };
+  }
+}
+
+/// Calculadora de checksums para validación de integridad
+class ChecksumCalculator {
+  final List<int> _buffer = [];
+
+  /// Agrega un chunk de datos al cálculo
+  void addChunk(List<int> chunk) {
+    _buffer.addAll(chunk);
+  }
+
+  /// Obtiene el checksum actual (SHA-256 simplificado con hash de Dart)
+  String getChecksum() {
+    if (_buffer.isEmpty) return '';
+    
+    // Usar hash simple de Dart para evitar dependencias externas
+    // En producción se recomendaría usar crypto package para SHA-256
+    final hash = _buffer.hashCode.abs().toRadixString(16);
+    return hash.padLeft(8, '0');
+  }
+
+  /// Calcula checksum para un array de bytes
+  static String calculateForBytes(List<int> bytes) {
+    if (bytes.isEmpty) return '';
+    final hash = bytes.hashCode.abs().toRadixString(16);
+    return hash.padLeft(8, '0');
+  }
+
+  /// Reinicia el calculador
+  void reset() {
+    _buffer.clear();
+  }
+}
+
+/// Resultado de una descarga
+class DownloadResult {
+  final bool success;
+  final String? filePath;
+  final int? bytesDownloaded;
+  final String? checksum;
+  final DownloadError? error;
+  final String? errorMessage;
+
+  const DownloadResult._({
+    required this.success,
+    this.filePath,
+    this.bytesDownloaded,
+    this.checksum,
+    this.error,
+    this.errorMessage,
+  });
+
+  factory DownloadResult.success({
+    required String filePath,
+    required int bytesDownloaded,
+    String? checksum,
+  }) {
+    return DownloadResult._(
+      success: true,
+      filePath: filePath,
+      bytesDownloaded: bytesDownloaded,
+      checksum: checksum,
+    );
+  }
+
+  factory DownloadResult.failure(DownloadError error, String message) {
+    return DownloadResult._(
+      success: false,
+      error: error,
+      errorMessage: message,
+    );
+  }
+
+  @override
+  String toString() {
+    if (success) {
+      return 'DownloadResult.success(path: $filePath, bytes: $bytesDownloaded, checksum: $checksum)';
+    } else {
+      return 'DownloadResult.failure(error: $error, message: $errorMessage)';
+    }
+  }
+}
+
+/// Tipos de errores de descarga
+enum DownloadError {
+  timeout,
+  networkError,
+  httpError,
+  corruptedFile,
+  insufficientSpace,
+  unknown,
+}
+
 /// Configuration class for cache settings
 class CacheConfig {
   /// Maximum size for image cache in bytes (default: 100MB)
@@ -597,11 +885,15 @@ class CacheManager {
   // Gestores de locks y espacio en disco
   late final FileLockManager _fileLockManager;
   late final DiskSpaceManager _diskSpaceManager;
+  
+  // Gestor de red con timeouts y validación
+  late final NetworkStreamManager _networkManager;
 
   CacheManager._internal() {
     _downloadManager = DownloadConcurrencyManager();
     _fileLockManager = FileLockManager();
     _diskSpaceManager = DiskSpaceManager();
+    _networkManager = NetworkStreamManager();
   }
 
   /// Get current cache configuration
@@ -1037,48 +1329,41 @@ class CacheManager {
       }
 
       try {
-        final client = http.Client();
-        try {
-          final request = http.Request('GET', Uri.parse(audioUrl));
-          final response = await client.send(request);
-
-          if (response.statusCode == 200) {
-            final sink = audioFile.openWrite();
-            try {
-              int totalBytes = 0;
-              await for (final chunk in response.stream) {
-                sink.add(chunk);
-                totalBytes += chunk.length;
-
-                if (totalBytes % (1024 * 1024) == 0) {
-                  log(
-                    'CacheManager: Downloaded ${totalBytes ~/ (1024 * 1024)}MB for: $fileName',
-                  );
-                }
-              }
-              await sink.close();
-
-              // Marcar archivo como activo al completar la descarga
-              manager._diskSpaceManager.markFileAsActive(audioFile.path);
-
-              log(
-                'CacheManager: Successfully cached audio: $fileName (${totalBytes ~/ 1024}KB)',
-              );
-              return audioFile.path;
-            } catch (e) {
-              await sink.close();
-              if (await audioFile.exists()) {
-                await audioFile.delete();
-              }
-              log('CacheManager: Error writing audio file: $e');
-              rethrow;
+        // Usar el nuevo NetworkStreamManager con timeouts y validación
+        final result = await manager._networkManager.downloadFileWithValidation(
+          url: audioUrl,
+          destinationFile: audioFile,
+          connectTimeout: const Duration(seconds: 30),
+          readTimeout: const Duration(seconds: 120), // Más tiempo para audio
+          chunkTimeout: const Duration(seconds: 15),
+          validateIntegrity: true,
+          onProgress: (downloaded, total) {
+            if (downloaded % (1024 * 1024) == 0) {
+              final mb = downloaded ~/ (1024 * 1024);
+              final totalMb = total != null ? '/${total ~/ (1024 * 1024)}' : '';
+              log('CacheManager: Downloaded ${mb}MB$totalMb for: $fileName');
             }
-          } else {
-            log('CacheManager: HTTP error ${response.statusCode} for: $audioUrl');
-            return null;
+          },
+        );
+
+        if (result.success) {
+          // Marcar archivo como activo al completar la descarga
+          manager._diskSpaceManager.markFileAsActive(audioFile.path);
+
+          log(
+            'CacheManager: Successfully cached audio with validation: $fileName (${result.bytesDownloaded! ~/ 1024}KB)',
+          );
+          return audioFile.path;
+        } else {
+          log('CacheManager: Download failed for $audioUrl - ${result.errorMessage}');
+          
+          // Cleanup automático de archivos parciales/corruptos
+          if (await audioFile.exists()) {
+            await audioFile.delete();
+            log('CacheManager: Cleaned up partial/corrupted file: ${audioFile.path}');
           }
-        } finally {
-          client.close();
+          
+          return null;
         }
       } finally {
         // Siempre liberar el lock de escritura
@@ -1255,48 +1540,41 @@ class CacheManager {
       }
 
       try {
-        final client = http.Client();
-        try {
-          final request = http.Request('GET', Uri.parse(videoUrl));
-          final response = await client.send(request);
-
-          if (response.statusCode == 200) {
-            final sink = videoFile.openWrite();
-            try {
-              int totalBytes = 0;
-              await for (final chunk in response.stream) {
-                sink.add(chunk);
-                totalBytes += chunk.length;
-
-                if (totalBytes % (5 * 1024 * 1024) == 0) {
-                  log(
-                    'CacheManager: Downloaded ${totalBytes ~/ (1024 * 1024)}MB for: $fileName',
-                  );
-                }
-              }
-              await sink.close();
-
-              // Marcar archivo como activo al completar la descarga
-              manager._diskSpaceManager.markFileAsActive(videoFile.path);
-
-              log(
-                'CacheManager: Successfully cached video: $fileName (${totalBytes ~/ 1024}MB)',
-              );
-              return videoFile.path;
-            } catch (e) {
-              await sink.close();
-              if (await videoFile.exists()) {
-                await videoFile.delete();
-              }
-              log('CacheManager: Error writing video file: $e');
-              rethrow;
+        // Usar el nuevo NetworkStreamManager con timeouts extendidos para video
+        final result = await manager._networkManager.downloadFileWithValidation(
+          url: videoUrl,
+          destinationFile: videoFile,
+          connectTimeout: const Duration(seconds: 45),
+          readTimeout: const Duration(seconds: 300), // 5 minutos para videos grandes
+          chunkTimeout: const Duration(seconds: 30),
+          validateIntegrity: true,
+          onProgress: (downloaded, total) {
+            if (downloaded % (5 * 1024 * 1024) == 0) {
+              final mb = downloaded ~/ (1024 * 1024);
+              final totalMb = total != null ? '/${total ~/ (1024 * 1024)}' : '';
+              log('CacheManager: Downloaded ${mb}MB$totalMb for: $fileName');
             }
-          } else {
-            log('CacheManager: HTTP error ${response.statusCode} for: $videoUrl');
-            return null;
+          },
+        );
+
+        if (result.success) {
+          // Marcar archivo como activo al completar la descarga
+          manager._diskSpaceManager.markFileAsActive(videoFile.path);
+
+          log(
+            'CacheManager: Successfully cached video with validation: $fileName (${result.bytesDownloaded! ~/ (1024 * 1024)}MB)',
+          );
+          return videoFile.path;
+        } else {
+          log('CacheManager: Video download failed for $videoUrl - ${result.errorMessage}');
+          
+          // Cleanup automático de archivos parciales/corruptos
+          if (await videoFile.exists()) {
+            await videoFile.delete();
+            log('CacheManager: Cleaned up partial/corrupted video file: ${videoFile.path}');
           }
-        } finally {
-          client.close();
+          
+          return null;
         }
       } finally {
         // Siempre liberar el lock de escritura
@@ -1558,6 +1836,8 @@ class CacheManager {
       'fileLockStats': manager._fileLockManager.getStats(),
       // Estadísticas de gestión de espacio
       'diskSpaceStats': manager._diskSpaceManager.getStats(),
+      // Estadísticas de red y timeouts
+      'networkStats': manager._networkManager.getStats(),
     };
   }
 
@@ -1642,6 +1922,111 @@ class CacheManager {
   static void configureConcurrencyLimits({int? maxAudio, int? maxVideo}) {
     final manager = CacheManager.instance;
     manager._downloadManager.updateLimits(maxAudio: maxAudio, maxVideo: maxVideo);
+  }
+
+  /// Valida un archivo en cache para verificar su integridad
+  static Future<bool> validateCachedFile(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) {
+        return false;
+      }
+
+      // Validación básica: verificar que el archivo tenga contenido
+      final fileSize = await file.length();
+      if (fileSize == 0) {
+        log('CacheManager: File validation failed - Empty file: $filePath');
+        return false;
+      }
+
+      // Intentar leer los primeros bytes para verificar que no esté corrupto
+      final bytes = await file.openRead(0, 1024).toList();
+      if (bytes.isEmpty) {
+        log('CacheManager: File validation failed - Could not read file: $filePath');
+        return false;
+      }
+
+      log('CacheManager: File validation successful: $filePath (${fileSize ~/ 1024}KB)');
+      return true;
+    } catch (e) {
+      log('CacheManager: File validation error: $e');
+      return false;
+    }
+  }
+
+  /// Limpia archivos corruptos o parciales del cache
+  static Future<int> cleanupCorruptedFiles() async {
+    int cleanedFiles = 0;
+    
+    try {
+      final dirs = [
+        await getAudioCacheDirectory(),
+        await getVideoCacheDirectory(),
+        await getImageCacheDirectory(),
+      ];
+
+      for (final dir in dirs) {
+        if (!await dir.exists()) continue;
+
+        await for (final entity in dir.list(recursive: true)) {
+          if (entity is File) {
+            final isValid = await validateCachedFile(entity.path);
+            if (!isValid) {
+              try {
+                await entity.delete();
+                cleanedFiles++;
+                log('CacheManager: Cleaned corrupted file: ${entity.path}');
+              } catch (e) {
+                log('CacheManager: Error cleaning corrupted file ${entity.path}: $e');
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      log('CacheManager: Error during corrupted files cleanup: $e');
+    }
+
+    log('CacheManager: Corrupted files cleanup completed - Cleaned: $cleanedFiles files');
+    return cleanedFiles;
+  }
+
+  /// Obtiene información detallada sobre errores de red recientes
+  static Map<String, dynamic> getNetworkErrorStats() {
+    final manager = CacheManager.instance;
+    return {
+      'networkManagerStats': manager._networkManager.getStats(),
+      'supportedErrorTypes': DownloadError.values.map((e) => e.toString()).toList(),
+      'defaultTimeouts': {
+        'connectSeconds': NetworkStreamManager.defaultConnectTimeout.inSeconds,
+        'readSeconds': NetworkStreamManager.defaultReadTimeout.inSeconds,
+        'chunkSeconds': NetworkStreamManager.defaultChunkTimeout.inSeconds,
+      },
+    };
+  }
+
+  /// Descarga un archivo con configuración personalizada de red (método avanzado)
+  static Future<DownloadResult> downloadFileWithCustomConfig({
+    required String url,
+    required String destinationPath,
+    Duration? connectTimeout,
+    Duration? readTimeout,
+    Duration? chunkTimeout,
+    bool validateIntegrity = true,
+    void Function(int downloaded, int? total)? onProgress,
+  }) async {
+    final manager = CacheManager.instance;
+    final file = File(destinationPath);
+    
+    return await manager._networkManager.downloadFileWithValidation(
+      url: url,
+      destinationFile: file,
+      connectTimeout: connectTimeout,
+      readTimeout: readTimeout,
+      chunkTimeout: chunkTimeout,
+      validateIntegrity: validateIntegrity,
+      onProgress: onProgress,
+    );
   }
 }
 

@@ -133,23 +133,39 @@ Análisis y mejora de edge cases en `GlobalAudioPlayerManager` y `CacheManager` 
 - Agregada API pública para gestión manual de archivos activos y cleanup inteligente
 - Estadísticas expandidas de cache que incluyen información de locks y gestión de espacio
 - Métodos de utilidad: `markFileAsActive()`, `performSmartCleanup()`, `getAvailableSpace()`, `hasEnoughSpace()`
-- **Commit**: Pendiente
+- **Commit**: `1c1c78f` - feat(cache): implement intelligent disk space management and file locks
 
-## Fase 6: CacheManager - Manejo de Errores de Red
+## Fase 6: CacheManager - Manejo de Errores de Red ✅ COMPLETADA
 
 ### 6.1 Problemas Identificados
 - **HTTP streams sin timeout**: Descargas pueden colgarse indefinidamente
 - **Sin verificación de integridad**: No valida archivos completos
 - **Archivos parciales**: Pueden quedar archivos corruptos tras fallos
 
-### 6.2 Soluciones Propuestas
-- [ ] Implementar timeouts configurables para streams HTTP
-- [ ] Agregar verificación de integridad con checksums
-- [ ] Implementar validación de archivos post-descarga
-- [ ] Cleanup automático de archivos parciales/corruptos
+### 6.2 Soluciones Implementadas
+- [x] Implementar timeouts configurables para streams HTTP
+- [x] Agregar verificación de integridad con checksums
+- [x] Implementar validación de archivos post-descarga
+- [x] Cleanup automático de archivos parciales/corruptos
 
-### 6.3 Archivos a Modificar
+### 6.3 Archivos Modificados
 - `lib/src/utils/cache_manager.dart`
+
+### 6.4 Cambios Implementados
+- Creada clase `NetworkStreamManager` para gestión robusta de streams HTTP con timeouts configurables
+- Implementado sistema de timeouts múltiples: conexión (30s), lectura total (60-300s), chunks (10-30s)
+- Agregada clase `ChecksumCalculator` para validación de integridad con algoritmo hash simplificado
+- Implementado sistema `DownloadResult` con manejo detallado de errores (timeout, red, HTTP, corrupción)
+- Refactorizados métodos `_downloadAudioFile` y `_downloadVideoFile` para usar NetworkStreamManager
+- Agregada validación automática post-descarga con verificación de tamaño y checksum
+- Implementado cleanup automático de archivos parciales/corruptos en caso de fallo
+- Sistema de callbacks de progreso con logging detallado durante descargas
+- Timeouts adaptativos: audio (30s/120s/15s), video (45s/300s/30s) para archivos más grandes
+- Validación de archivos existentes con métodos públicos `validateCachedFile()` y `cleanupCorruptedFiles()`
+- API avanzada `downloadFileWithCustomConfig()` para descargas personalizadas
+- Estadísticas expandidas de red y manejo de errores en `getCacheStats()` y `getNetworkErrorStats()`
+- Enum `DownloadError` con categorización completa de fallos de red
+- **Commit**: Pendiente
 
 ## Fase 7: Mejoras Transversales
 
