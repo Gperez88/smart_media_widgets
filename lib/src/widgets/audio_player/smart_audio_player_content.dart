@@ -1,7 +1,9 @@
+import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:flutter/material.dart';
 
 import 'smart_audio_play_pause_button.dart';
 import 'smart_audio_time_display.dart';
+import 'smart_audio_waveform_widget.dart';
 
 class AudioPlayerContent extends StatelessWidget {
   final double? width;
@@ -27,6 +29,8 @@ class AudioPlayerContent extends StatelessWidget {
   final VoidCallback onTogglePlayPause;
   final Widget? leftWidget;
   final Widget? rightWidget;
+  final PlayerController? playerController;
+  final Function(Duration)? onSeek;
 
   const AudioPlayerContent({
     super.key,
@@ -53,6 +57,8 @@ class AudioPlayerContent extends StatelessWidget {
     required this.onTogglePlayPause,
     this.leftWidget,
     this.rightWidget,
+    this.playerController,
+    this.onSeek,
   });
 
   @override
@@ -107,7 +113,7 @@ class AudioPlayerContent extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildProgressSection(),
+                          _buildWaveformSection(),
                           if (showDuration || showPosition) ...[
                             const SizedBox(height: 4),
                             _buildTimeDisplay(),
@@ -129,24 +135,35 @@ class AudioPlayerContent extends StatelessWidget {
     );
   }
 
-  Widget _buildProgressSection() {
+  Widget _buildWaveformSection() {
+    if (playerController == null) {
+      return _buildFallbackProgressBar();
+    }
+
+    return SmartAudioWaveformWidget(
+      playerController: playerController!,
+      height: 16,
+      color: Colors.white.withValues(alpha: 0.8),
+      backgroundColor: Colors.white.withValues(alpha: 0.3),
+      position: position,
+      duration: duration,
+      onSeek: onSeek,
+    );
+  }
+
+  Widget _buildFallbackProgressBar() {
     final progress = duration.inMilliseconds > 0
         ? position.inMilliseconds / duration.inMilliseconds
         : 0.0;
-
-    // Debug log para verificar los valores
-    debugPrint(
-      'AudioPlayerContent: Position: ${position.inSeconds}s, Duration: ${duration.inSeconds}s, Progress: ${(progress * 100).toStringAsFixed(1)}%',
-    );
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         LinearProgressIndicator(
           value: progress.clamp(0.0, 1.0),
-          backgroundColor: Colors.white.withOpacity(0.3),
+          backgroundColor: Colors.white.withValues(alpha: 0.3),
           valueColor: AlwaysStoppedAnimation<Color>(
-            Colors.white.withOpacity(0.8),
+            Colors.white.withValues(alpha: 0.8),
           ),
           minHeight: 4,
         ),

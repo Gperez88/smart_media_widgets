@@ -650,6 +650,22 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
     }
   }
 
+  /// Handle seek to specific position
+  Future<void> _onSeek(Duration position) async {
+    if (_isDisposed) return;
+
+    try {
+      if (widget.enableGlobal) {
+        final manager = GlobalAudioPlayerManager.instance;
+        await manager.seekTo(_playerId, position);
+      } else {
+        await _effectivePlayerController.seekTo(position.inMilliseconds);
+      }
+    } catch (e) {
+      debugPrint('AudioPlayerWidget: Error seeking to position: $e');
+    }
+  }
+
   /// Handle player errors and attempt recovery
   Future<void> _handlePlayerError(dynamic error) async {
     if (_isDisposed) return;
@@ -725,6 +741,8 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
       onTogglePlayPause: _togglePlayPause,
       leftWidget: widget.leftWidget,
       rightWidget: widget.rightWidget,
+      playerController: _effectivePlayerController,
+      onSeek: _onSeek,
     );
   }
 }
