@@ -730,6 +730,743 @@ enum DownloadError {
   unknown,
 }
 
+/// Niveles de logging para el sistema
+enum LogLevel {
+  debug,    // Información detallada para debugging
+  info,     // Información general del sistema
+  warning,  // Advertencias que no afectan funcionalidad
+  error,    // Errores que requieren atención
+  critical, // Errores críticos que afectan funcionalidad
+}
+
+/// Logger estructurado centralizado para Smart Media Widgets
+class SmartMediaLogger {
+  static final SmartMediaLogger _instance = SmartMediaLogger._internal();
+  factory SmartMediaLogger() => _instance;
+  SmartMediaLogger._internal();
+
+  LogLevel _currentLevel = LogLevel.info;
+  bool _enableConsoleOutput = true;
+  bool _enableStructuredLogging = true;
+  final List<LogEntry> _logHistory = [];
+  static const int _maxHistorySize = 1000;
+
+  /// Configura el nivel de logging global
+  void setLogLevel(LogLevel level) {
+    _currentLevel = level;
+    _logInfo('SmartMediaLogger', 'Log level changed to: ${level.name}');
+  }
+
+  /// Configura la salida a consola
+  void setConsoleOutput(bool enabled) {
+    _enableConsoleOutput = enabled;
+  }
+
+  /// Configura el logging estructurado
+  void setStructuredLogging(bool enabled) {
+    _enableStructuredLogging = enabled;
+  }
+
+  /// Log de nivel debug
+  void debug(String component, String message, [Map<String, dynamic>? context]) {
+    _log(LogLevel.debug, component, message, context);
+  }
+
+  /// Log de nivel info
+  void info(String component, String message, [Map<String, dynamic>? context]) {
+    _log(LogLevel.info, component, message, context);
+  }
+
+  /// Log de nivel warning
+  void warning(String component, String message, [Map<String, dynamic>? context]) {
+    _log(LogLevel.warning, component, message, context);
+  }
+
+  /// Log de nivel error
+  void error(String component, String message, [Map<String, dynamic>? context]) {
+    _log(LogLevel.error, component, message, context);
+  }
+
+  /// Log de nivel critical
+  void critical(String component, String message, [Map<String, dynamic>? context]) {
+    _log(LogLevel.critical, component, message, context);
+  }
+
+  /// Método interno de logging
+  void _log(LogLevel level, String component, String message, [Map<String, dynamic>? context]) {
+    if (level.index < _currentLevel.index) return;
+
+    final entry = LogEntry(
+      timestamp: DateTime.now(),
+      level: level,
+      component: component,
+      message: message,
+      context: context ?? {},
+    );
+
+    // Agregar a historial
+    _logHistory.add(entry);
+    if (_logHistory.length > _maxHistorySize) {
+      _logHistory.removeAt(0);
+    }
+
+    // Output a consola si está habilitado
+    if (_enableConsoleOutput) {
+      final formattedMessage = _enableStructuredLogging 
+          ? _formatStructured(entry)
+          : _formatSimple(entry);
+      
+      // Usar log() de dart:developer para output a consola
+      log(formattedMessage, name: component);
+    }
+  }
+
+  /// Formatea mensaje estructurado
+  String _formatStructured(LogEntry entry) {
+    final buffer = StringBuffer();
+    buffer.write('[${entry.level.name.toUpperCase()}] ');
+    buffer.write('${entry.timestamp.toIso8601String()} ');
+    buffer.write('${entry.component}: ');
+    buffer.write(entry.message);
+    
+    if (entry.context.isNotEmpty) {
+      buffer.write(' | Context: ${entry.context}');
+    }
+    
+    return buffer.toString();
+  }
+
+  /// Formatea mensaje simple
+  String _formatSimple(LogEntry entry) {
+    return '${entry.component}: ${entry.message}';
+  }
+
+  /// Shortcut para logging simple (backward compatibility)
+  void _logInfo(String component, String message) {
+    info(component, message);
+  }
+
+  /// Obtiene historial de logs recientes
+  List<LogEntry> getRecentLogs({LogLevel? minLevel, int? limit}) {
+    var filtered = _logHistory.where((entry) {
+      if (minLevel != null && entry.level.index < minLevel.index) return false;
+      return true;
+    }).toList();
+
+    if (limit != null && filtered.length > limit) {
+      filtered = filtered.sublist(filtered.length - limit);
+    }
+
+    return filtered;
+  }
+
+  /// Limpia el historial de logs
+  void clearHistory() {
+    _logHistory.clear();
+    info('SmartMediaLogger', 'Log history cleared');
+  }
+
+  /// Obtiene estadísticas del logger
+  Map<String, dynamic> getStats() {
+    final levelCounts = <String, int>{};
+    for (final level in LogLevel.values) {
+      levelCounts[level.name] = _logHistory.where((e) => e.level == level).length;
+    }
+
+    return {
+      'currentLevel': _currentLevel.name,
+      'consoleOutput': _enableConsoleOutput,
+      'structuredLogging': _enableStructuredLogging,
+      'historySize': _logHistory.length,
+      'maxHistorySize': _maxHistorySize,
+      'levelCounts': levelCounts,
+    };
+  }
+}
+
+/// Entrada individual de log
+class LogEntry {
+  final DateTime timestamp;
+  final LogLevel level;
+  final String component;
+  final String message;
+  final Map<String, dynamic> context;
+
+  const LogEntry({
+    required this.timestamp,
+    required this.level,
+    required this.component,
+    required this.message,
+    required this.context,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'timestamp': timestamp.toIso8601String(),
+      'level': level.name,
+      'component': component,
+      'message': message,
+      'context': context,
+    };
+  }
+}
+
+/// Gestor de métricas de performance y monitoreo
+class PerformanceMetrics {
+  static final PerformanceMetrics _instance = PerformanceMetrics._internal();
+  factory PerformanceMetrics() => _instance;
+  PerformanceMetrics._internal();
+
+  final Map<String, MetricTracker> _metrics = {};
+  final Map<String, DateTime> _operationStartTimes = {};
+  static const int _maxMetricHistory = 100;
+
+  /// Inicia el seguimiento de una operación
+  void startOperation(String operationName) {
+    _operationStartTimes[operationName] = DateTime.now();
+    _getOrCreateMetric(operationName).incrementCount();
+    
+    SmartMediaLogger().debug('PerformanceMetrics', 'Started operation: $operationName');
+  }
+
+  /// Finaliza el seguimiento de una operación
+  void endOperation(String operationName, {bool success = true}) {
+    final startTime = _operationStartTimes.remove(operationName);
+    if (startTime == null) {
+      SmartMediaLogger().warning('PerformanceMetrics', 'End operation called without start: $operationName');
+      return;
+    }
+
+    final duration = DateTime.now().difference(startTime);
+    final metric = _getOrCreateMetric(operationName);
+    
+    metric.addDuration(duration);
+    if (success) {
+      metric.incrementSuccess();
+    } else {
+      metric.incrementFailure();
+    }
+
+    SmartMediaLogger().debug('PerformanceMetrics', 'Completed operation: $operationName in ${duration.inMilliseconds}ms', {
+      'duration_ms': duration.inMilliseconds,
+      'success': success,
+    });
+  }
+
+  /// Registra una métrica personalizada
+  void recordMetric(String name, double value, {Map<String, dynamic>? tags}) {
+    final metric = _getOrCreateMetric(name);
+    metric.addCustomValue(value);
+    
+    SmartMediaLogger().debug('PerformanceMetrics', 'Recorded metric: $name = $value', tags);
+  }
+
+  /// Incrementa un contador
+  void incrementCounter(String name, {int delta = 1}) {
+    final metric = _getOrCreateMetric(name);
+    metric.incrementCount(delta);
+    
+    SmartMediaLogger().debug('PerformanceMetrics', 'Incremented counter: $name by $delta');
+  }
+
+  /// Obtiene o crea una métrica
+  MetricTracker _getOrCreateMetric(String name) {
+    return _metrics.putIfAbsent(name, () => MetricTracker(name));
+  }
+
+  /// Obtiene estadísticas de todas las métricas
+  Map<String, dynamic> getAllMetrics() {
+    final result = <String, dynamic>{};
+    
+    for (final entry in _metrics.entries) {
+      result[entry.key] = entry.value.getStats();
+    }
+    
+    return result;
+  }
+
+  /// Obtiene estadísticas de una métrica específica
+  Map<String, dynamic>? getMetric(String name) {
+    return _metrics[name]?.getStats();
+  }
+
+  /// Resetea todas las métricas
+  void resetMetrics() {
+    _metrics.clear();
+    _operationStartTimes.clear();
+    SmartMediaLogger().info('PerformanceMetrics', 'All metrics reset');
+  }
+
+  /// Obtiene resumen de performance
+  Map<String, dynamic> getPerformanceSummary() {
+    final summary = <String, dynamic>{
+      'totalMetrics': _metrics.length,
+      'ongoingOperations': _operationStartTimes.length,
+      'topSlowOperations': <Map<String, dynamic>>[],
+      'topFailureRates': <Map<String, dynamic>>[],
+    };
+
+    // Top 5 operaciones más lentas
+    final sortedByDuration = _metrics.entries.toList()
+      ..sort((a, b) => b.value.averageDuration.compareTo(a.value.averageDuration));
+    
+    summary['topSlowOperations'] = sortedByDuration
+        .take(5)
+        .map((e) => {
+          'operation': e.key,
+          'avgDuration': e.value.averageDuration,
+          'maxDuration': e.value.maxDuration,
+        })
+        .toList();
+
+    // Top 5 operaciones con más fallos
+    final sortedByFailures = _metrics.entries.toList()
+      ..sort((a, b) => b.value.failureRate.compareTo(a.value.failureRate));
+    
+    summary['topFailureRates'] = sortedByFailures
+        .take(5)
+        .where((e) => e.value.failureRate > 0)
+        .map((e) => {
+          'operation': e.key,
+          'failureRate': e.value.failureRate,
+          'totalFailures': e.value.failures,
+        })
+        .toList();
+
+    return summary;
+  }
+}
+
+/// Tracker individual para una métrica
+class MetricTracker {
+  final String name;
+  int _count = 0;
+  int _successes = 0;
+  int _failures = 0;
+  final List<Duration> _durations = [];
+  final List<double> _customValues = [];
+
+  MetricTracker(this.name);
+
+  void incrementCount([int delta = 1]) => _count += delta;
+  void incrementSuccess() => _successes++;
+  void incrementFailure() => _failures++;
+
+  void addDuration(Duration duration) {
+    _durations.add(duration);
+    if (_durations.length > PerformanceMetrics._maxMetricHistory) {
+      _durations.removeAt(0);
+    }
+  }
+
+  void addCustomValue(double value) {
+    _customValues.add(value);
+    if (_customValues.length > PerformanceMetrics._maxMetricHistory) {
+      _customValues.removeAt(0);
+    }
+  }
+
+  double get averageDuration {
+    if (_durations.isEmpty) return 0.0;
+    final totalMs = _durations.fold<int>(0, (sum, d) => sum + d.inMilliseconds);
+    return totalMs / _durations.length;
+  }
+
+  int get maxDuration {
+    if (_durations.isEmpty) return 0;
+    return _durations.fold<int>(0, (max, d) => d.inMilliseconds > max ? d.inMilliseconds : max);
+  }
+
+  double get failureRate {
+    final total = _successes + _failures;
+    return total > 0 ? _failures / total : 0.0;
+  }
+
+  int get failures => _failures;
+
+  Map<String, dynamic> getStats() {
+    return {
+      'name': name,
+      'count': _count,
+      'successes': _successes,
+      'failures': _failures,
+      'failureRate': failureRate,
+      'averageDurationMs': averageDuration,
+      'maxDurationMs': maxDuration,
+      'totalDurations': _durations.length,
+      'customValues': _customValues.length,
+      'customValuesAvg': _customValues.isEmpty ? 0.0 : _customValues.reduce((a, b) => a + b) / _customValues.length,
+    };
+  }
+}
+
+/// Sistema de configuración adaptativa basado en condiciones del dispositivo
+class AdaptiveConfigManager {
+  static final AdaptiveConfigManager _instance = AdaptiveConfigManager._internal();
+  factory AdaptiveConfigManager() => _instance;
+  AdaptiveConfigManager._internal();
+
+  DeviceProfile _currentProfile = DeviceProfile.medium;
+  bool _autoAdaptationEnabled = true;
+  DateTime _lastProfileUpdate = DateTime.now();
+
+  /// Detecta y ajusta el perfil del dispositivo automáticamente
+  Future<void> detectAndApplyProfile() async {
+    if (!_autoAdaptationEnabled) return;
+
+    final newProfile = await _detectDeviceProfile();
+    if (newProfile != _currentProfile) {
+      _currentProfile = newProfile;
+      _lastProfileUpdate = DateTime.now();
+      
+      SmartMediaLogger().info('AdaptiveConfigManager', 'Device profile changed to: ${newProfile.name}');
+      
+      // Aplicar configuraciones automáticamente
+      await _applyProfileSettings(newProfile);
+    }
+  }
+
+  /// Detecta el perfil del dispositivo basado en capacidades
+  Future<DeviceProfile> _detectDeviceProfile() async {
+    try {
+      // En un entorno real, esto se basaría en:
+      // - RAM disponible
+      // - Velocidad de red
+      // - Espacio de almacenamiento
+      // - Capacidad de procesamiento
+      
+      // Por ahora usamos una detección simplificada
+      final performanceMetrics = PerformanceMetrics();
+      final recentMetrics = performanceMetrics.getPerformanceSummary();
+      
+      // Heurística simple basada en métricas de performance
+      final avgOperationTime = _getAverageOperationTime(recentMetrics);
+      
+      if (avgOperationTime > 5000) { // > 5 segundos
+        return DeviceProfile.low;
+      } else if (avgOperationTime > 2000) { // > 2 segundos
+        return DeviceProfile.medium;
+      } else {
+        return DeviceProfile.high;
+      }
+    } catch (e) {
+      SmartMediaLogger().warning('AdaptiveConfigManager', 'Error detecting device profile: $e');
+      return DeviceProfile.medium; // Default seguro
+    }
+  }
+
+  /// Obtiene tiempo promedio de operaciones
+  double _getAverageOperationTime(Map<String, dynamic> metrics) {
+    final topSlow = metrics['topSlowOperations'] as List<dynamic>;
+    if (topSlow.isEmpty) return 1000.0; // Default 1 segundo
+    
+    double total = 0.0;
+    for (final op in topSlow) {
+      total += (op['avgDuration'] as double);
+    }
+    
+    return total / topSlow.length;
+  }
+
+  /// Aplica configuraciones basadas en el perfil
+  Future<void> _applyProfileSettings(DeviceProfile profile) async {
+    final cacheManager = CacheManager.instance;
+    
+    switch (profile) {
+      case DeviceProfile.low:
+        // Configuración conservadora
+        cacheManager._downloadManager.updateLimits(maxAudio: 1, maxVideo: 1);
+        SmartMediaLogger().setLogLevel(LogLevel.warning); // Menos logs
+        break;
+        
+      case DeviceProfile.medium:
+        // Configuración balanceada
+        cacheManager._downloadManager.updateLimits(maxAudio: 2, maxVideo: 1);
+        SmartMediaLogger().setLogLevel(LogLevel.info);
+        break;
+        
+      case DeviceProfile.high:
+        // Configuración optimizada
+        cacheManager._downloadManager.updateLimits(maxAudio: 4, maxVideo: 3);
+        SmartMediaLogger().setLogLevel(LogLevel.debug);
+        break;
+    }
+
+    SmartMediaLogger().info('AdaptiveConfigManager', 'Applied ${profile.name} profile settings');
+  }
+
+  /// Fuerza un perfil específico (deshabilita auto-adaptación)
+  void setProfile(DeviceProfile profile, {bool disableAutoAdaptation = true}) {
+    _currentProfile = profile;
+    _autoAdaptationEnabled = !disableAutoAdaptation;
+    _lastProfileUpdate = DateTime.now();
+    
+    _applyProfileSettings(profile);
+    
+    SmartMediaLogger().info('AdaptiveConfigManager', 'Manually set profile to: ${profile.name}');
+  }
+
+  /// Habilita/deshabilita la adaptación automática
+  void setAutoAdaptation(bool enabled) {
+    _autoAdaptationEnabled = enabled;
+    SmartMediaLogger().info('AdaptiveConfigManager', 'Auto-adaptation ${enabled ? 'enabled' : 'disabled'}');
+  }
+
+  /// Obtiene el perfil actual
+  DeviceProfile get currentProfile => _currentProfile;
+
+  /// Obtiene estadísticas del gestor adaptativo
+  Map<String, dynamic> getStats() {
+    return {
+      'currentProfile': _currentProfile.name,
+      'autoAdaptationEnabled': _autoAdaptationEnabled,
+      'lastProfileUpdate': _lastProfileUpdate.toIso8601String(),
+      'timeSinceLastUpdate': DateTime.now().difference(_lastProfileUpdate).inMinutes,
+    };
+  }
+}
+
+/// Perfiles de dispositivo para configuración adaptativa
+enum DeviceProfile {
+  low,    // Dispositivos con recursos limitados
+  medium, // Dispositivos balanceados (default)
+  high,   // Dispositivos de alta performance
+}
+
+/// Health Check Manager para monitoreo de componentes
+class HealthCheckManager {
+  static final HealthCheckManager _instance = HealthCheckManager._internal();
+  factory HealthCheckManager() => _instance;
+  HealthCheckManager._internal();
+
+  final Map<String, HealthCheck> _healthChecks = {};
+  Timer? _periodicCheckTimer;
+  bool _isRunning = false;
+
+  /// Inicia los health checks periódicos
+  void startPeriodicChecks({Duration interval = const Duration(minutes: 5)}) {
+    if (_isRunning) return;
+    
+    _isRunning = true;
+    _periodicCheckTimer = Timer.periodic(interval, (timer) {
+      _runAllChecks();
+    });
+    
+    SmartMediaLogger().info('HealthCheckManager', 'Started periodic health checks every ${interval.inMinutes} minutes');
+  }
+
+  /// Detiene los health checks periódicos
+  void stopPeriodicChecks() {
+    _periodicCheckTimer?.cancel();
+    _periodicCheckTimer = null;
+    _isRunning = false;
+    
+    SmartMediaLogger().info('HealthCheckManager', 'Stopped periodic health checks');
+  }
+
+  /// Registra un health check
+  void registerHealthCheck(String name, Future<HealthCheckResult> Function() checkFunction) {
+    _healthChecks[name] = HealthCheck(name, checkFunction);
+    SmartMediaLogger().debug('HealthCheckManager', 'Registered health check: $name');
+  }
+
+  /// Ejecuta todos los health checks
+  Future<Map<String, HealthCheckResult>> _runAllChecks() async {
+    final results = <String, HealthCheckResult>{};
+    
+    SmartMediaLogger().debug('HealthCheckManager', 'Running ${_healthChecks.length} health checks');
+    
+    for (final entry in _healthChecks.entries) {
+      try {
+        final startTime = DateTime.now();
+        final result = await entry.value.checkFunction();
+        final duration = DateTime.now().difference(startTime);
+        
+        result.duration = duration;
+        results[entry.key] = result;
+        
+        SmartMediaLogger().debug('HealthCheckManager', 
+          'Health check ${entry.key}: ${result.status.name} in ${duration.inMilliseconds}ms',
+          {'status': result.status.name, 'duration_ms': duration.inMilliseconds}
+        );
+        
+      } catch (e) {
+        results[entry.key] = HealthCheckResult.failed(
+          'Health check exception: $e',
+          Duration.zero,
+        );
+        
+        SmartMediaLogger().error('HealthCheckManager', 'Health check ${entry.key} failed with exception: $e');
+      }
+    }
+    
+    return results;
+  }
+
+  /// Ejecuta health checks bajo demanda
+  Future<Map<String, HealthCheckResult>> runHealthChecks() async {
+    return await _runAllChecks();
+  }
+
+  /// Obtiene el estado general del sistema
+  Future<SystemHealthStatus> getSystemHealth() async {
+    final results = await _runAllChecks();
+    
+    int healthy = 0;
+    int degraded = 0;
+    int failed = 0;
+    
+    for (final result in results.values) {
+      switch (result.status) {
+        case HealthStatus.healthy:
+          healthy++;
+          break;
+        case HealthStatus.degraded:
+          degraded++;
+          break;
+        case HealthStatus.failed:
+          failed++;
+          break;
+      }
+    }
+    
+    final totalChecks = results.length;
+    SystemHealthStatus overallStatus;
+    
+    if (failed > 0) {
+      overallStatus = SystemHealthStatus.critical;
+    } else if (degraded > totalChecks * 0.3) { // >30% degraded
+      overallStatus = SystemHealthStatus.degraded;
+    } else {
+      overallStatus = SystemHealthStatus.healthy;
+    }
+    
+    return overallStatus;
+  }
+
+  /// Obtiene estadísticas de health checks
+  Map<String, dynamic> getStats() {
+    return {
+      'totalHealthChecks': _healthChecks.length,
+      'periodicChecksRunning': _isRunning,
+      'registeredChecks': _healthChecks.keys.toList(),
+    };
+  }
+
+  /// Inicializa health checks por defecto para Smart Media Widgets
+  void initializeDefaultHealthChecks() {
+    // Health check para CacheManager
+    registerHealthCheck('cache_manager', () async {
+      try {
+        final stats = await CacheManager.getCacheStats();
+        final totalSize = stats['totalCacheSize'] as int;
+        
+        if (totalSize > 2000 * 1024 * 1024) { // >2GB
+          return HealthCheckResult.degraded('Cache size is very large: ${totalSize ~/ (1024 * 1024)}MB');
+        }
+        
+        return HealthCheckResult.healthy('Cache functioning normally');
+      } catch (e) {
+        return HealthCheckResult.failed('Cache manager error: $e');
+      }
+    });
+
+    // Health check para conectividad de red
+    registerHealthCheck('network_connectivity', () async {
+      try {
+        final result = await CacheManager.downloadFileWithCustomConfig(
+          url: 'https://httpbin.org/status/200',
+          destinationPath: '/tmp/health_check_test',
+          connectTimeout: const Duration(seconds: 5),
+          readTimeout: const Duration(seconds: 10),
+          validateIntegrity: false,
+        );
+        
+        if (result.success) {
+          return HealthCheckResult.healthy('Network connectivity OK');
+        } else {
+          return HealthCheckResult.degraded('Network connectivity issues: ${result.errorMessage}');
+        }
+      } catch (e) {
+        return HealthCheckResult.failed('Network connectivity failed: $e');
+      }
+    });
+
+    // Health check para métricas de performance
+    registerHealthCheck('performance_metrics', () async {
+      try {
+        final metrics = PerformanceMetrics();
+        final summary = metrics.getPerformanceSummary();
+        final slowOps = summary['topSlowOperations'] as List<dynamic>;
+        
+        if (slowOps.isNotEmpty) {
+          final slowest = slowOps.first['avgDuration'] as double;
+          if (slowest > 10000) { // >10 segundos
+            return HealthCheckResult.degraded('Some operations are very slow: ${slowest.toInt()}ms');
+          }
+        }
+        
+        return HealthCheckResult.healthy('Performance metrics within acceptable range');
+      } catch (e) {
+        return HealthCheckResult.failed('Performance metrics error: $e');
+      }
+    });
+
+    SmartMediaLogger().info('HealthCheckManager', 'Initialized ${_healthChecks.length} default health checks');
+  }
+}
+
+/// Health check individual
+class HealthCheck {
+  final String name;
+  final Future<HealthCheckResult> Function() checkFunction;
+
+  HealthCheck(this.name, this.checkFunction);
+}
+
+/// Resultado de un health check
+class HealthCheckResult {
+  final HealthStatus status;
+  final String message;
+  Duration? duration;
+
+  HealthCheckResult._(this.status, this.message, [this.duration]);
+
+  factory HealthCheckResult.healthy(String message) {
+    return HealthCheckResult._(HealthStatus.healthy, message);
+  }
+
+  factory HealthCheckResult.degraded(String message) {
+    return HealthCheckResult._(HealthStatus.degraded, message);
+  }
+
+  factory HealthCheckResult.failed(String message, [Duration? duration]) {
+    return HealthCheckResult._(HealthStatus.failed, message, duration);
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'status': status.name,
+      'message': message,
+      'duration_ms': duration?.inMilliseconds,
+    };
+  }
+}
+
+/// Estados de health check
+enum HealthStatus {
+  healthy,  // Funcionando correctamente
+  degraded, // Funcionando pero con problemas menores
+  failed,   // No funcionando
+}
+
+/// Estado general del sistema
+enum SystemHealthStatus {
+  healthy,  // Todo funcionando bien
+  degraded, // Algunos problemas pero funcional
+  critical, // Problemas graves que afectan funcionalidad
+}
+
 /// Configuration class for cache settings
 class CacheConfig {
   /// Maximum size for image cache in bytes (default: 100MB)
@@ -888,12 +1625,32 @@ class CacheManager {
   
   // Gestor de red con timeouts y validación
   late final NetworkStreamManager _networkManager;
+  
+  // Gestores transversales
+  late final SmartMediaLogger _logger;
+  late final PerformanceMetrics _performanceMetrics;
+  late final AdaptiveConfigManager _adaptiveConfigManager;
+  late final HealthCheckManager _healthCheckManager;
 
   CacheManager._internal() {
     _downloadManager = DownloadConcurrencyManager();
     _fileLockManager = FileLockManager();
     _diskSpaceManager = DiskSpaceManager();
     _networkManager = NetworkStreamManager();
+    
+    // Inicializar gestores transversales
+    _logger = SmartMediaLogger();
+    _performanceMetrics = PerformanceMetrics();
+    _adaptiveConfigManager = AdaptiveConfigManager();
+    _healthCheckManager = HealthCheckManager();
+    
+    // Configurar health checks básicos
+    _setupBasicHealthChecks();
+    
+    // Iniciar health checks periódicos
+    _healthCheckManager.startPeriodicChecks();
+    
+    _logger.info('CacheManager', 'CacheManager initialized with transversal improvements');
   }
 
   /// Get current cache configuration
@@ -942,6 +1699,53 @@ class CacheManager {
     if (_originalConfig != null) {
       _config = _originalConfig!;
     }
+  }
+
+  /// Configura health checks básicos para componentes del cache manager
+  void _setupBasicHealthChecks() {
+    // Health check para el estado del cache manager
+    _healthCheckManager.registerHealthCheck('cache_manager', () async {
+      try {
+        final stats = await getCacheStats();
+        final totalSize = stats['totalCacheSize'] as int;
+        final maxSize = _config.maxImageCacheSize + _config.maxVideoCacheSize + _config.maxAudioCacheSize;
+        
+        if (totalSize > maxSize * 1.1) { // 10% tolerance
+          return HealthCheckResult.failed('Cache size exceeded limits', Duration.zero);
+        }
+        
+        return HealthCheckResult.healthy('Cache manager healthy');
+      } catch (e) {
+        return HealthCheckResult.failed('Error checking cache: $e', Duration.zero);
+      }
+    });
+    
+    // Health check para el gestor de descargas
+    _healthCheckManager.registerHealthCheck('download_manager', () async {
+      final stats = _downloadManager.getStats();
+      final activeDownloads = stats['activeDownloads'] as int;
+      final maxConcurrent = (stats['maxAudioConcurrent'] as int) + (stats['maxVideoConcurrent'] as int);
+      
+      if (activeDownloads > maxConcurrent) {
+        return HealthCheckResult.failed('Too many active downloads', Duration.zero);
+      }
+      
+      return HealthCheckResult.healthy('Download manager healthy');
+    });
+    
+    // Health check para el espacio en disco
+    _healthCheckManager.registerHealthCheck('disk_space', () async {
+      try {
+        final hasSpace = await _diskSpaceManager.hasEnoughSpace('temp_check', 100 * 1024 * 1024); // 100MB minimum
+        if (!hasSpace) {
+          return HealthCheckResult.failed('Low disk space', Duration.zero);
+        }
+        
+        return HealthCheckResult.healthy('Disk space healthy');
+      } catch (e) {
+        return HealthCheckResult.failed('Error checking disk space: $e', Duration.zero);
+      }
+    });
   }
 
   /// Configura límites de descarga dinámicos basados en dispositivo
@@ -1838,6 +2642,11 @@ class CacheManager {
       'diskSpaceStats': manager._diskSpaceManager.getStats(),
       // Estadísticas de red y timeouts
       'networkStats': manager._networkManager.getStats(),
+      // Estadísticas transversales
+      'performanceMetrics': manager._performanceMetrics.getAllMetrics(),
+      'adaptiveConfigStats': manager._adaptiveConfigManager.getStats(),
+      'healthCheckResults': await manager._healthCheckManager.runHealthChecks(),
+      'loggerStats': manager._logger.getStats(),
     };
   }
 
@@ -2027,6 +2836,99 @@ class CacheManager {
       validateIntegrity: validateIntegrity,
       onProgress: onProgress,
     );
+  }
+
+  // ===========================================
+  // API Pública para Gestores Transversales
+  // ===========================================
+
+  /// Configura el nivel de logging
+  static void setLogLevel(LogLevel level) {
+    CacheManager.instance._logger._currentLevel = level;
+  }
+
+  /// Configura la salida del logging
+  static void setLoggerConfig({
+    bool? enableConsoleOutput,
+    bool? enableStructuredLogging,
+  }) {
+    final logger = CacheManager.instance._logger;
+    if (enableConsoleOutput != null) {
+      logger._enableConsoleOutput = enableConsoleOutput;
+    }
+    if (enableStructuredLogging != null) {
+      logger._enableStructuredLogging = enableStructuredLogging;
+    }
+  }
+
+  /// Obtiene el historial de logs recientes
+  static List<LogEntry> getRecentLogs({int? limit}) {
+    return CacheManager.instance._logger.getRecentLogs(limit: limit);
+  }
+
+  /// Obtiene estadísticas de performance
+  static Map<String, dynamic> getPerformanceMetrics() {
+    return CacheManager.instance._performanceMetrics.getAllMetrics();
+  }
+
+  /// Obtiene métricas específicas de una operación
+  static Map<String, dynamic>? getOperationMetrics(String operationName) {
+    return CacheManager.instance._performanceMetrics.getMetric(operationName);
+  }
+
+  /// Configura el perfil de dispositivo manualmente
+  static void setDeviceProfile(DeviceProfile profile, {bool disableAutoAdaptation = false}) {
+    CacheManager.instance._adaptiveConfigManager.setProfile(profile, disableAutoAdaptation: disableAutoAdaptation);
+  }
+
+  /// Habilita/deshabilita la adaptación automática de configuración
+  static void setAutoAdaptation(bool enabled) {
+    CacheManager.instance._adaptiveConfigManager.setAutoAdaptation(enabled);
+  }
+
+  /// Obtiene el perfil de dispositivo actual
+  static DeviceProfile getCurrentDeviceProfile() {
+    return CacheManager.instance._adaptiveConfigManager.currentProfile;
+  }
+
+  /// Ejecuta health checks manualmente
+  static Future<Map<String, HealthCheckResult>> runHealthChecks() async {
+    return CacheManager.instance._healthCheckManager.runHealthChecks();
+  }
+
+  /// Configura health checks periódicos
+  static void configureHealthChecks({
+    Duration? interval,
+    bool? enabled,
+  }) {
+    final healthManager = CacheManager.instance._healthCheckManager;
+    
+    if (enabled == false) {
+      healthManager.stopPeriodicChecks();
+    } else if (enabled == true || interval != null) {
+      healthManager.stopPeriodicChecks();
+      healthManager.startPeriodicChecks(interval: interval ?? const Duration(minutes: 5));
+    }
+  }
+
+  /// Registra un health check personalizado
+  static void registerCustomHealthCheck(
+    String name,
+    Future<HealthCheckResult> Function() checkFunction,
+  ) {
+    CacheManager.instance._healthCheckManager.registerHealthCheck(name, checkFunction);
+  }
+
+  /// Obtiene estadísticas completas del sistema transversal
+  static Future<Map<String, dynamic>> getTransversalStats() async {
+    final manager = CacheManager.instance;
+    
+    return {
+      'logging': manager._logger.getStats(),
+      'performance': manager._performanceMetrics.getAllMetrics(),
+      'adaptiveConfig': manager._adaptiveConfigManager.getStats(),
+      'healthChecks': await manager._healthCheckManager.runHealthChecks(),
+    };
   }
 }
 
