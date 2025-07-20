@@ -13,11 +13,11 @@ class DownloadConcurrencyManager {
   int _videoDownloads = 0;
   int _maxAudioDownloads;
   int _maxVideoDownloads;
-  
+
   // Mapas para rastrear descargas en progreso y evitar duplicados
   final Map<String, Completer<String?>> _audioDownloadsInProgress = {};
   final Map<String, Completer<String?>> _videoDownloadsInProgress = {};
-  
+
   // Queue de prioridades para descargas pendientes
   final List<_DownloadRequest> _pendingDownloads = [];
   Timer? _downloadProcessorTimer;
@@ -34,7 +34,9 @@ class DownloadConcurrencyManager {
   void updateLimits({int? maxAudio, int? maxVideo}) {
     _maxAudioDownloads = maxAudio ?? _maxAudioDownloads;
     _maxVideoDownloads = maxVideo ?? _maxVideoDownloads;
-    log('DownloadConcurrencyManager: Updated limits - Audio: $_maxAudioDownloads, Video: $_maxVideoDownloads');
+    log(
+      'DownloadConcurrencyManager: Updated limits - Audio: $_maxAudioDownloads, Video: $_maxVideoDownloads',
+    );
   }
 
   /// Verifica si se puede iniciar una descarga de audio
@@ -46,34 +48,47 @@ class DownloadConcurrencyManager {
   /// Incrementa contador de audio de manera thread-safe
   void incrementAudioDownloads() {
     _audioDownloads++;
-    log('DownloadConcurrencyManager: Audio downloads: $_audioDownloads/$_maxAudioDownloads');
+    log(
+      'DownloadConcurrencyManager: Audio downloads: $_audioDownloads/$_maxAudioDownloads',
+    );
   }
 
   /// Decrementa contador de audio de manera thread-safe
   void decrementAudioDownloads() {
     _audioDownloads = (_audioDownloads - 1).clamp(0, _maxAudioDownloads);
-    log('DownloadConcurrencyManager: Audio downloads: $_audioDownloads/$_maxAudioDownloads');
+    log(
+      'DownloadConcurrencyManager: Audio downloads: $_audioDownloads/$_maxAudioDownloads',
+    );
     _processNextDownload();
   }
 
   /// Incrementa contador de video de manera thread-safe
   void incrementVideoDownloads() {
     _videoDownloads++;
-    log('DownloadConcurrencyManager: Video downloads: $_videoDownloads/$_maxVideoDownloads');
+    log(
+      'DownloadConcurrencyManager: Video downloads: $_videoDownloads/$_maxVideoDownloads',
+    );
   }
 
   /// Decrementa contador de video de manera thread-safe
   void decrementVideoDownloads() {
     _videoDownloads = (_videoDownloads - 1).clamp(0, _maxVideoDownloads);
-    log('DownloadConcurrencyManager: Video downloads: $_videoDownloads/$_maxVideoDownloads');
+    log(
+      'DownloadConcurrencyManager: Video downloads: $_videoDownloads/$_maxVideoDownloads',
+    );
     _processNextDownload();
   }
 
   /// Registra una descarga en progreso para evitar duplicados
-  Future<String?> registerAudioDownload(String url, Future<String?> Function() downloadFunction) async {
+  Future<String?> registerAudioDownload(
+    String url,
+    Future<String?> Function() downloadFunction,
+  ) async {
     // Si ya está en progreso, esperar a que termine
     if (_audioDownloadsInProgress.containsKey(url)) {
-      log('DownloadConcurrencyManager: Audio download already in progress for: $url');
+      log(
+        'DownloadConcurrencyManager: Audio download already in progress for: $url',
+      );
       return await _audioDownloadsInProgress[url]!.future;
     }
 
@@ -93,10 +108,15 @@ class DownloadConcurrencyManager {
   }
 
   /// Registra una descarga de video en progreso
-  Future<String?> registerVideoDownload(String url, Future<String?> Function() downloadFunction) async {
+  Future<String?> registerVideoDownload(
+    String url,
+    Future<String?> Function() downloadFunction,
+  ) async {
     // Si ya está en progreso, esperar a que termine
     if (_videoDownloadsInProgress.containsKey(url)) {
-      log('DownloadConcurrencyManager: Video download already in progress for: $url');
+      log(
+        'DownloadConcurrencyManager: Video download already in progress for: $url',
+      );
       return await _videoDownloadsInProgress[url]!.future;
     }
 
@@ -118,8 +138,10 @@ class DownloadConcurrencyManager {
   /// Agenda una descarga si no hay slots disponibles
   Future<String?> _scheduleDownload(_DownloadRequest request) async {
     _pendingDownloads.add(request);
-    log('DownloadConcurrencyManager: Scheduled ${request.type} download: ${request.url} (queue: ${_pendingDownloads.length})');
-    
+    log(
+      'DownloadConcurrencyManager: Scheduled ${request.type} download: ${request.url} (queue: ${_pendingDownloads.length})',
+    );
+
     return await request.completer.future;
   }
 
@@ -140,14 +162,17 @@ class DownloadConcurrencyManager {
 
       if (request.type == _DownloadType.audio && canStartAudioDownload()) {
         canStart = true;
-      } else if (request.type == _DownloadType.video && canStartVideoDownload()) {
+      } else if (request.type == _DownloadType.video &&
+          canStartVideoDownload()) {
         canStart = true;
       }
 
       if (canStart) {
         _pendingDownloads.removeAt(i);
-        log('DownloadConcurrencyManager: Starting queued ${request.type} download (priority: ${request.priority}): ${request.url}');
-        
+        log(
+          'DownloadConcurrencyManager: Starting queued ${request.type} download (priority: ${request.priority}): ${request.url}',
+        );
+
         // Ejecutar la descarga
         _executeDownload(request);
         break; // Solo procesar una descarga por vez
@@ -167,9 +192,12 @@ class DownloadConcurrencyManager {
 
   /// Inicia el procesador de descargas
   void _startDownloadProcessor() {
-    _downloadProcessorTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      _processNextDownload();
-    });
+    _downloadProcessorTimer = Timer.periodic(
+      const Duration(milliseconds: 500),
+      (timer) {
+        _processNextDownload();
+      },
+    );
   }
 
   /// Obtiene estadísticas de descargas
@@ -189,13 +217,13 @@ class DownloadConcurrencyManager {
   void dispose() {
     _downloadProcessorTimer?.cancel();
     _downloadProcessorTimer = null;
-    
+
     // Cancelar descargas pendientes
     for (final request in _pendingDownloads) {
       request.completer.completeError('Download manager disposed');
     }
     _pendingDownloads.clear();
-    
+
     _audioDownloadsInProgress.clear();
     _videoDownloadsInProgress.clear();
   }
@@ -251,7 +279,8 @@ class FileLockManager {
 
   /// Adquiere un lock de escritura para un archivo
   bool acquireWriteLock(String filePath) {
-    if (_filesBeingCleaned.contains(filePath) || _filesBeingWritten.contains(filePath)) {
+    if (_filesBeingCleaned.contains(filePath) ||
+        _filesBeingWritten.contains(filePath)) {
       return false;
     }
     _filesBeingWritten.add(filePath);
@@ -267,7 +296,8 @@ class FileLockManager {
 
   /// Adquiere un lock de limpieza para un archivo
   bool acquireCleanupLock(String filePath) {
-    if (_filesBeingWritten.contains(filePath) || _filesBeingCleaned.contains(filePath)) {
+    if (_filesBeingWritten.contains(filePath) ||
+        _filesBeingCleaned.contains(filePath)) {
       return false;
     }
     _filesBeingCleaned.add(filePath);
@@ -281,7 +311,8 @@ class FileLockManager {
 
   /// Verifica si un archivo puede ser limpiado de manera segura
   bool canCleanupFile(String filePath) {
-    return !_filesBeingWritten.contains(filePath) && !_filesBeingCleaned.contains(filePath);
+    return !_filesBeingWritten.contains(filePath) &&
+        !_filesBeingCleaned.contains(filePath);
   }
 
   /// Obtiene estadísticas de locks activos
@@ -331,13 +362,13 @@ class DiskSpaceManager {
       if (!await directory.exists()) {
         await directory.create(recursive: true);
       }
-      
+
       // En sistemas móviles, esto es una aproximación
       // En un entorno real se usaría platform channels para obtener espacio exacto
       final tempFile = File('${directory.path}/.space_check.tmp');
       await tempFile.writeAsString('test');
       await tempFile.delete();
-      
+
       // Retornamos un valor conservador (1GB disponible por defecto)
       // En producción esto debería ser implementado con platform channels
       return 1024 * 1024 * 1024; // 1GB
@@ -351,13 +382,18 @@ class DiskSpaceManager {
   Future<bool> hasEnoughSpace(String directoryPath, int requiredBytes) async {
     final availableSpace = await getAvailableSpace(directoryPath);
     final hasSpace = availableSpace >= requiredBytes * 1.2; // 20% buffer
-    
-    log('DiskSpaceManager: Space check - Required: ${requiredBytes ~/ 1024}KB, Available: ${availableSpace ~/ 1024}KB, HasSpace: $hasSpace');
+
+    log(
+      'DiskSpaceManager: Space check - Required: ${requiredBytes ~/ 1024}KB, Available: ${availableSpace ~/ 1024}KB, HasSpace: $hasSpace',
+    );
     return hasSpace;
   }
 
   /// Obtiene archivos ordenados por prioridad de limpieza
-  Future<List<File>> getFilesForCleanup(Directory directory, {bool includeActive = false}) async {
+  Future<List<File>> getFilesForCleanup(
+    Directory directory, {
+    bool includeActive = false,
+  }) async {
     if (!await directory.exists()) return [];
 
     final files = <File>[];
@@ -375,14 +411,14 @@ class DiskSpaceManager {
     files.sort((a, b) {
       final aLastAccess = _lastAccessTime[a.path];
       final bLastAccess = _lastAccessTime[b.path];
-      
+
       // Archivos sin registro de acceso van primero
       if (aLastAccess == null && bLastAccess == null) {
         return a.statSync().modified.compareTo(b.statSync().modified);
       }
       if (aLastAccess == null) return -1;
       if (bLastAccess == null) return 1;
-      
+
       return aLastAccess.compareTo(bLastAccess);
     });
 
@@ -391,35 +427,40 @@ class DiskSpaceManager {
 
   /// Limpia archivos automáticamente respetando archivos activos
   Future<int> cleanupFilesRespectingActive(
-    Directory directory, 
-    int targetSizeReduction,
-    {bool emergencyMode = false}
-  ) async {
+    Directory directory,
+    int targetSizeReduction, {
+    bool emergencyMode = false,
+  }) async {
     int cleanedSize = 0;
     final fileLockManager = FileLockManager();
-    
-    final files = await getFilesForCleanup(directory, includeActive: emergencyMode);
-    
+
+    final files = await getFilesForCleanup(
+      directory,
+      includeActive: emergencyMode,
+    );
+
     for (final file in files) {
       if (cleanedSize >= targetSizeReduction) break;
-      
+
       // Intentar adquirir lock de limpieza
       if (!fileLockManager.acquireCleanupLock(file.path)) {
         log('DiskSpaceManager: Skipping locked file: ${file.path}');
         continue;
       }
-      
+
       try {
         if (await file.exists()) {
           final fileSize = await file.length();
           await file.delete();
           cleanedSize += fileSize;
-          
+
           // Limpiar registros del archivo eliminado
           _activeFiles.remove(file.path);
           _lastAccessTime.remove(file.path);
-          
-          log('DiskSpaceManager: Deleted file: ${file.path} (${fileSize ~/ 1024}KB)');
+
+          log(
+            'DiskSpaceManager: Deleted file: ${file.path} (${fileSize ~/ 1024}KB)',
+          );
         }
       } catch (e) {
         log('DiskSpaceManager: Error deleting file ${file.path}: $e');
@@ -427,8 +468,10 @@ class DiskSpaceManager {
         fileLockManager.releaseCleanupLock(file.path);
       }
     }
-    
-    log('DiskSpaceManager: Cleanup completed - Target: ${targetSizeReduction ~/ 1024}KB, Cleaned: ${cleanedSize ~/ 1024}KB');
+
+    log(
+      'DiskSpaceManager: Cleanup completed - Target: ${targetSizeReduction ~/ 1024}KB, Cleaned: ${cleanedSize ~/ 1024}KB',
+    );
     return cleanedSize;
   }
 
@@ -444,7 +487,8 @@ class DiskSpaceManager {
 
 /// Gestiona timeouts y validación de streams HTTP
 class NetworkStreamManager {
-  static final NetworkStreamManager _instance = NetworkStreamManager._internal();
+  static final NetworkStreamManager _instance =
+      NetworkStreamManager._internal();
   factory NetworkStreamManager() => _instance;
   NetworkStreamManager._internal();
 
@@ -467,7 +511,9 @@ class NetworkStreamManager {
     final effectiveReadTimeout = readTimeout ?? defaultReadTimeout;
     final effectiveChunkTimeout = chunkTimeout ?? defaultChunkTimeout;
 
-    log('NetworkStreamManager: Starting download with timeouts - Connect: ${effectiveConnectTimeout.inSeconds}s, Read: ${effectiveReadTimeout.inSeconds}s, Chunk: ${effectiveChunkTimeout.inSeconds}s');
+    log(
+      'NetworkStreamManager: Starting download with timeouts - Connect: ${effectiveConnectTimeout.inSeconds}s, Read: ${effectiveReadTimeout.inSeconds}s, Chunk: ${effectiveChunkTimeout.inSeconds}s',
+    );
 
     final client = http.Client();
     Completer<DownloadResult>? downloadCompleter;
@@ -480,10 +526,12 @@ class NetworkStreamManager {
       // Timer de conexión
       connectionTimer = Timer(effectiveConnectTimeout, () {
         if (!downloadCompleter!.isCompleted) {
-          downloadCompleter.complete(DownloadResult.failure(
-            DownloadError.timeout,
-            'Connection timeout after ${effectiveConnectTimeout.inSeconds}s'
-          ));
+          downloadCompleter.complete(
+            DownloadResult.failure(
+              DownloadError.timeout,
+              'Connection timeout after ${effectiveConnectTimeout.inSeconds}s',
+            ),
+          );
         }
       });
 
@@ -496,17 +544,19 @@ class NetworkStreamManager {
       if (response.statusCode != 200) {
         return DownloadResult.failure(
           DownloadError.httpError,
-          'HTTP ${response.statusCode}: ${response.reasonPhrase}'
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
         );
       }
 
       // Timer de lectura total
       readTimer = Timer(effectiveReadTimeout, () {
         if (!downloadCompleter!.isCompleted) {
-          downloadCompleter.complete(DownloadResult.failure(
-            DownloadError.timeout,
-            'Read timeout after ${effectiveReadTimeout.inSeconds}s'
-          ));
+          downloadCompleter.complete(
+            DownloadResult.failure(
+              DownloadError.timeout,
+              'Read timeout after ${effectiveReadTimeout.inSeconds}s',
+            ),
+          );
         }
       });
 
@@ -522,7 +572,7 @@ class NetworkStreamManager {
           if (now.difference(lastChunkTime) > effectiveChunkTimeout) {
             throw TimeoutException(
               'Chunk timeout after ${effectiveChunkTimeout.inSeconds}s without data',
-              effectiveChunkTimeout
+              effectiveChunkTimeout,
             );
           }
 
@@ -540,7 +590,9 @@ class NetworkStreamManager {
 
           // Log de progreso cada MB
           if (totalBytes % (1024 * 1024) == 0) {
-            log('NetworkStreamManager: Downloaded ${totalBytes ~/ (1024 * 1024)}MB');
+            log(
+              'NetworkStreamManager: Downloaded ${totalBytes ~/ (1024 * 1024)}MB',
+            );
           }
         }
 
@@ -550,29 +602,34 @@ class NetworkStreamManager {
         // Validar integridad del archivo descargado
         if (validateIntegrity) {
           final isValid = await _validateDownloadedFile(
-            destinationFile, 
+            destinationFile,
             checksumCalculator.getChecksum(),
-            totalBytes
+            totalBytes,
           );
-          
+
           if (!isValid) {
             return DownloadResult.failure(
               DownloadError.corruptedFile,
-              'File integrity validation failed'
+              'File integrity validation failed',
             );
           }
         }
 
-        log('NetworkStreamManager: Download completed successfully - ${totalBytes ~/ 1024}KB');
-        
-        if (!downloadCompleter.isCompleted) {
-          downloadCompleter.complete(DownloadResult.success(
-            filePath: destinationFile.path,
-            bytesDownloaded: totalBytes,
-            checksum: validateIntegrity ? checksumCalculator.getChecksum() : null,
-          ));
-        }
+        log(
+          'NetworkStreamManager: Download completed successfully - ${totalBytes ~/ 1024}KB',
+        );
 
+        if (!downloadCompleter.isCompleted) {
+          downloadCompleter.complete(
+            DownloadResult.success(
+              filePath: destinationFile.path,
+              bytesDownloaded: totalBytes,
+              checksum: validateIntegrity
+                  ? checksumCalculator.getChecksum()
+                  : null,
+            ),
+          );
+        }
       } catch (e) {
         await sink.close();
         if (await destinationFile.exists()) {
@@ -580,10 +637,12 @@ class NetworkStreamManager {
         }
         rethrow;
       }
-
     } on TimeoutException catch (e) {
       log('NetworkStreamManager: Timeout error: ${e.message}');
-      return DownloadResult.failure(DownloadError.timeout, e.message ?? 'Timeout');
+      return DownloadResult.failure(
+        DownloadError.timeout,
+        e.message ?? 'Timeout',
+      );
     } catch (e) {
       log('NetworkStreamManager: Download error: $e');
       return DownloadResult.failure(DownloadError.networkError, e.toString());
@@ -597,7 +656,11 @@ class NetworkStreamManager {
   }
 
   /// Valida un archivo descargado
-  Future<bool> _validateDownloadedFile(File file, String expectedChecksum, int expectedSize) async {
+  Future<bool> _validateDownloadedFile(
+    File file,
+    String expectedChecksum,
+    int expectedSize,
+  ) async {
     try {
       if (!await file.exists()) {
         log('NetworkStreamManager: Validation failed - File does not exist');
@@ -606,7 +669,9 @@ class NetworkStreamManager {
 
       final actualSize = await file.length();
       if (actualSize != expectedSize) {
-        log('NetworkStreamManager: Validation failed - Size mismatch. Expected: $expectedSize, Actual: $actualSize');
+        log(
+          'NetworkStreamManager: Validation failed - Size mismatch. Expected: $expectedSize, Actual: $actualSize',
+        );
         return false;
       }
 
@@ -614,7 +679,7 @@ class NetworkStreamManager {
       if (expectedChecksum.isNotEmpty) {
         final fileBytes = await file.readAsBytes();
         final actualChecksum = ChecksumCalculator.calculateForBytes(fileBytes);
-        
+
         if (actualChecksum != expectedChecksum) {
           log('NetworkStreamManager: Validation failed - Checksum mismatch');
           return false;
@@ -651,7 +716,7 @@ class ChecksumCalculator {
   /// Obtiene el checksum actual (SHA-256 simplificado con hash de Dart)
   String getChecksum() {
     if (_buffer.isEmpty) return '';
-    
+
     // Usar hash simple de Dart para evitar dependencias externas
     // En producción se recomendaría usar crypto package para SHA-256
     final hash = _buffer.hashCode.abs().toRadixString(16);
@@ -732,10 +797,10 @@ enum DownloadError {
 
 /// Niveles de logging para el sistema
 enum LogLevel {
-  debug,    // Información detallada para debugging
-  info,     // Información general del sistema
-  warning,  // Advertencias que no afectan funcionalidad
-  error,    // Errores que requieren atención
+  debug, // Información detallada para debugging
+  info, // Información general del sistema
+  warning, // Advertencias que no afectan funcionalidad
+  error, // Errores que requieren atención
   critical, // Errores críticos que afectan funcionalidad
 }
 
@@ -768,7 +833,11 @@ class SmartMediaLogger {
   }
 
   /// Log de nivel debug
-  void debug(String component, String message, [Map<String, dynamic>? context]) {
+  void debug(
+    String component,
+    String message, [
+    Map<String, dynamic>? context,
+  ]) {
     _log(LogLevel.debug, component, message, context);
   }
 
@@ -778,22 +847,39 @@ class SmartMediaLogger {
   }
 
   /// Log de nivel warning
-  void warning(String component, String message, [Map<String, dynamic>? context]) {
+  void warning(
+    String component,
+    String message, [
+    Map<String, dynamic>? context,
+  ]) {
     _log(LogLevel.warning, component, message, context);
   }
 
   /// Log de nivel error
-  void error(String component, String message, [Map<String, dynamic>? context]) {
+  void error(
+    String component,
+    String message, [
+    Map<String, dynamic>? context,
+  ]) {
     _log(LogLevel.error, component, message, context);
   }
 
   /// Log de nivel critical
-  void critical(String component, String message, [Map<String, dynamic>? context]) {
+  void critical(
+    String component,
+    String message, [
+    Map<String, dynamic>? context,
+  ]) {
     _log(LogLevel.critical, component, message, context);
   }
 
   /// Método interno de logging
-  void _log(LogLevel level, String component, String message, [Map<String, dynamic>? context]) {
+  void _log(
+    LogLevel level,
+    String component,
+    String message, [
+    Map<String, dynamic>? context,
+  ]) {
     if (level.index < _currentLevel.index) return;
 
     final entry = LogEntry(
@@ -812,10 +898,10 @@ class SmartMediaLogger {
 
     // Output a consola si está habilitado
     if (_enableConsoleOutput) {
-      final formattedMessage = _enableStructuredLogging 
+      final formattedMessage = _enableStructuredLogging
           ? _formatStructured(entry)
           : _formatSimple(entry);
-      
+
       // Usar log() de dart:developer para output a consola
       log(formattedMessage, name: component);
     }
@@ -828,11 +914,11 @@ class SmartMediaLogger {
     buffer.write('${entry.timestamp.toIso8601String()} ');
     buffer.write('${entry.component}: ');
     buffer.write(entry.message);
-    
+
     if (entry.context.isNotEmpty) {
       buffer.write(' | Context: ${entry.context}');
     }
-    
+
     return buffer.toString();
   }
 
@@ -870,7 +956,9 @@ class SmartMediaLogger {
   Map<String, dynamic> getStats() {
     final levelCounts = <String, int>{};
     for (final level in LogLevel.values) {
-      levelCounts[level.name] = _logHistory.where((e) => e.level == level).length;
+      levelCounts[level.name] = _logHistory
+          .where((e) => e.level == level)
+          .length;
     }
 
     return {
@@ -925,21 +1013,27 @@ class PerformanceMetrics {
   void startOperation(String operationName) {
     _operationStartTimes[operationName] = DateTime.now();
     _getOrCreateMetric(operationName).incrementCount();
-    
-    SmartMediaLogger().debug('PerformanceMetrics', 'Started operation: $operationName');
+
+    SmartMediaLogger().debug(
+      'PerformanceMetrics',
+      'Started operation: $operationName',
+    );
   }
 
   /// Finaliza el seguimiento de una operación
   void endOperation(String operationName, {bool success = true}) {
     final startTime = _operationStartTimes.remove(operationName);
     if (startTime == null) {
-      SmartMediaLogger().warning('PerformanceMetrics', 'End operation called without start: $operationName');
+      SmartMediaLogger().warning(
+        'PerformanceMetrics',
+        'End operation called without start: $operationName',
+      );
       return;
     }
 
     final duration = DateTime.now().difference(startTime);
     final metric = _getOrCreateMetric(operationName);
-    
+
     metric.addDuration(duration);
     if (success) {
       metric.incrementSuccess();
@@ -947,26 +1041,34 @@ class PerformanceMetrics {
       metric.incrementFailure();
     }
 
-    SmartMediaLogger().debug('PerformanceMetrics', 'Completed operation: $operationName in ${duration.inMilliseconds}ms', {
-      'duration_ms': duration.inMilliseconds,
-      'success': success,
-    });
+    SmartMediaLogger().debug(
+      'PerformanceMetrics',
+      'Completed operation: $operationName in ${duration.inMilliseconds}ms',
+      {'duration_ms': duration.inMilliseconds, 'success': success},
+    );
   }
 
   /// Registra una métrica personalizada
   void recordMetric(String name, double value, {Map<String, dynamic>? tags}) {
     final metric = _getOrCreateMetric(name);
     metric.addCustomValue(value);
-    
-    SmartMediaLogger().debug('PerformanceMetrics', 'Recorded metric: $name = $value', tags);
+
+    SmartMediaLogger().debug(
+      'PerformanceMetrics',
+      'Recorded metric: $name = $value',
+      tags,
+    );
   }
 
   /// Incrementa un contador
   void incrementCounter(String name, {int delta = 1}) {
     final metric = _getOrCreateMetric(name);
     metric.incrementCount(delta);
-    
-    SmartMediaLogger().debug('PerformanceMetrics', 'Incremented counter: $name by $delta');
+
+    SmartMediaLogger().debug(
+      'PerformanceMetrics',
+      'Incremented counter: $name by $delta',
+    );
   }
 
   /// Obtiene o crea una métrica
@@ -977,11 +1079,11 @@ class PerformanceMetrics {
   /// Obtiene estadísticas de todas las métricas
   Map<String, dynamic> getAllMetrics() {
     final result = <String, dynamic>{};
-    
+
     for (final entry in _metrics.entries) {
       result[entry.key] = entry.value.getStats();
     }
-    
+
     return result;
   }
 
@@ -1008,29 +1110,35 @@ class PerformanceMetrics {
 
     // Top 5 operaciones más lentas
     final sortedByDuration = _metrics.entries.toList()
-      ..sort((a, b) => b.value.averageDuration.compareTo(a.value.averageDuration));
-    
+      ..sort(
+        (a, b) => b.value.averageDuration.compareTo(a.value.averageDuration),
+      );
+
     summary['topSlowOperations'] = sortedByDuration
         .take(5)
-        .map((e) => {
-          'operation': e.key,
-          'avgDuration': e.value.averageDuration,
-          'maxDuration': e.value.maxDuration,
-        })
+        .map(
+          (e) => {
+            'operation': e.key,
+            'avgDuration': e.value.averageDuration,
+            'maxDuration': e.value.maxDuration,
+          },
+        )
         .toList();
 
     // Top 5 operaciones con más fallos
     final sortedByFailures = _metrics.entries.toList()
       ..sort((a, b) => b.value.failureRate.compareTo(a.value.failureRate));
-    
+
     summary['topFailureRates'] = sortedByFailures
         .take(5)
         .where((e) => e.value.failureRate > 0)
-        .map((e) => {
-          'operation': e.key,
-          'failureRate': e.value.failureRate,
-          'totalFailures': e.value.failures,
-        })
+        .map(
+          (e) => {
+            'operation': e.key,
+            'failureRate': e.value.failureRate,
+            'totalFailures': e.value.failures,
+          },
+        )
         .toList();
 
     return summary;
@@ -1074,7 +1182,10 @@ class MetricTracker {
 
   int get maxDuration {
     if (_durations.isEmpty) return 0;
-    return _durations.fold<int>(0, (max, d) => d.inMilliseconds > max ? d.inMilliseconds : max);
+    return _durations.fold<int>(
+      0,
+      (max, d) => d.inMilliseconds > max ? d.inMilliseconds : max,
+    );
   }
 
   double get failureRate {
@@ -1095,14 +1206,17 @@ class MetricTracker {
       'maxDurationMs': maxDuration,
       'totalDurations': _durations.length,
       'customValues': _customValues.length,
-      'customValuesAvg': _customValues.isEmpty ? 0.0 : _customValues.reduce((a, b) => a + b) / _customValues.length,
+      'customValuesAvg': _customValues.isEmpty
+          ? 0.0
+          : _customValues.reduce((a, b) => a + b) / _customValues.length,
     };
   }
 }
 
 /// Sistema de configuración adaptativa basado en condiciones del dispositivo
 class AdaptiveConfigManager {
-  static final AdaptiveConfigManager _instance = AdaptiveConfigManager._internal();
+  static final AdaptiveConfigManager _instance =
+      AdaptiveConfigManager._internal();
   factory AdaptiveConfigManager() => _instance;
   AdaptiveConfigManager._internal();
 
@@ -1118,9 +1232,12 @@ class AdaptiveConfigManager {
     if (newProfile != _currentProfile) {
       _currentProfile = newProfile;
       _lastProfileUpdate = DateTime.now();
-      
-      SmartMediaLogger().info('AdaptiveConfigManager', 'Device profile changed to: ${newProfile.name}');
-      
+
+      SmartMediaLogger().info(
+        'AdaptiveConfigManager',
+        'Device profile changed to: ${newProfile.name}',
+      );
+
       // Aplicar configuraciones automáticamente
       await _applyProfileSettings(newProfile);
     }
@@ -1134,23 +1251,28 @@ class AdaptiveConfigManager {
       // - Velocidad de red
       // - Espacio de almacenamiento
       // - Capacidad de procesamiento
-      
+
       // Por ahora usamos una detección simplificada
       final performanceMetrics = PerformanceMetrics();
       final recentMetrics = performanceMetrics.getPerformanceSummary();
-      
+
       // Heurística simple basada en métricas de performance
       final avgOperationTime = _getAverageOperationTime(recentMetrics);
-      
-      if (avgOperationTime > 5000) { // > 5 segundos
+
+      if (avgOperationTime > 5000) {
+        // > 5 segundos
         return DeviceProfile.low;
-      } else if (avgOperationTime > 2000) { // > 2 segundos
+      } else if (avgOperationTime > 2000) {
+        // > 2 segundos
         return DeviceProfile.medium;
       } else {
         return DeviceProfile.high;
       }
     } catch (e) {
-      SmartMediaLogger().warning('AdaptiveConfigManager', 'Error detecting device profile: $e');
+      SmartMediaLogger().warning(
+        'AdaptiveConfigManager',
+        'Error detecting device profile: $e',
+      );
       return DeviceProfile.medium; // Default seguro
     }
   }
@@ -1159,32 +1281,32 @@ class AdaptiveConfigManager {
   double _getAverageOperationTime(Map<String, dynamic> metrics) {
     final topSlow = metrics['topSlowOperations'] as List<dynamic>;
     if (topSlow.isEmpty) return 1000.0; // Default 1 segundo
-    
+
     double total = 0.0;
     for (final op in topSlow) {
       total += (op['avgDuration'] as double);
     }
-    
+
     return total / topSlow.length;
   }
 
   /// Aplica configuraciones basadas en el perfil
   Future<void> _applyProfileSettings(DeviceProfile profile) async {
     final cacheManager = CacheManager.instance;
-    
+
     switch (profile) {
       case DeviceProfile.low:
         // Configuración conservadora
         cacheManager._downloadManager.updateLimits(maxAudio: 1, maxVideo: 1);
         SmartMediaLogger().setLogLevel(LogLevel.warning); // Menos logs
         break;
-        
+
       case DeviceProfile.medium:
         // Configuración balanceada
         cacheManager._downloadManager.updateLimits(maxAudio: 2, maxVideo: 1);
         SmartMediaLogger().setLogLevel(LogLevel.info);
         break;
-        
+
       case DeviceProfile.high:
         // Configuración optimizada
         cacheManager._downloadManager.updateLimits(maxAudio: 4, maxVideo: 3);
@@ -1192,7 +1314,10 @@ class AdaptiveConfigManager {
         break;
     }
 
-    SmartMediaLogger().info('AdaptiveConfigManager', 'Applied ${profile.name} profile settings');
+    SmartMediaLogger().info(
+      'AdaptiveConfigManager',
+      'Applied ${profile.name} profile settings',
+    );
   }
 
   /// Fuerza un perfil específico (deshabilita auto-adaptación)
@@ -1200,16 +1325,22 @@ class AdaptiveConfigManager {
     _currentProfile = profile;
     _autoAdaptationEnabled = !disableAutoAdaptation;
     _lastProfileUpdate = DateTime.now();
-    
+
     _applyProfileSettings(profile);
-    
-    SmartMediaLogger().info('AdaptiveConfigManager', 'Manually set profile to: ${profile.name}');
+
+    SmartMediaLogger().info(
+      'AdaptiveConfigManager',
+      'Manually set profile to: ${profile.name}',
+    );
   }
 
   /// Habilita/deshabilita la adaptación automática
   void setAutoAdaptation(bool enabled) {
     _autoAdaptationEnabled = enabled;
-    SmartMediaLogger().info('AdaptiveConfigManager', 'Auto-adaptation ${enabled ? 'enabled' : 'disabled'}');
+    SmartMediaLogger().info(
+      'AdaptiveConfigManager',
+      'Auto-adaptation ${enabled ? 'enabled' : 'disabled'}',
+    );
   }
 
   /// Obtiene el perfil actual
@@ -1221,16 +1352,18 @@ class AdaptiveConfigManager {
       'currentProfile': _currentProfile.name,
       'autoAdaptationEnabled': _autoAdaptationEnabled,
       'lastProfileUpdate': _lastProfileUpdate.toIso8601String(),
-      'timeSinceLastUpdate': DateTime.now().difference(_lastProfileUpdate).inMinutes,
+      'timeSinceLastUpdate': DateTime.now()
+          .difference(_lastProfileUpdate)
+          .inMinutes,
     };
   }
 }
 
 /// Perfiles de dispositivo para configuración adaptativa
 enum DeviceProfile {
-  low,    // Dispositivos con recursos limitados
+  low, // Dispositivos con recursos limitados
   medium, // Dispositivos balanceados (default)
-  high,   // Dispositivos de alta performance
+  high, // Dispositivos de alta performance
 }
 
 /// Health Check Manager para monitoreo de componentes
@@ -1246,13 +1379,16 @@ class HealthCheckManager {
   /// Inicia los health checks periódicos
   void startPeriodicChecks({Duration interval = const Duration(minutes: 5)}) {
     if (_isRunning) return;
-    
+
     _isRunning = true;
     _periodicCheckTimer = Timer.periodic(interval, (timer) {
       _runAllChecks();
     });
-    
-    SmartMediaLogger().info('HealthCheckManager', 'Started periodic health checks every ${interval.inMinutes} minutes');
+
+    SmartMediaLogger().info(
+      'HealthCheckManager',
+      'Started periodic health checks every ${interval.inMinutes} minutes',
+    );
   }
 
   /// Detiene los health checks periódicos
@@ -1260,46 +1396,64 @@ class HealthCheckManager {
     _periodicCheckTimer?.cancel();
     _periodicCheckTimer = null;
     _isRunning = false;
-    
-    SmartMediaLogger().info('HealthCheckManager', 'Stopped periodic health checks');
+
+    SmartMediaLogger().info(
+      'HealthCheckManager',
+      'Stopped periodic health checks',
+    );
   }
 
   /// Registra un health check
-  void registerHealthCheck(String name, Future<HealthCheckResult> Function() checkFunction) {
+  void registerHealthCheck(
+    String name,
+    Future<HealthCheckResult> Function() checkFunction,
+  ) {
     _healthChecks[name] = HealthCheck(name, checkFunction);
-    SmartMediaLogger().debug('HealthCheckManager', 'Registered health check: $name');
+    SmartMediaLogger().debug(
+      'HealthCheckManager',
+      'Registered health check: $name',
+    );
   }
 
   /// Ejecuta todos los health checks
   Future<Map<String, HealthCheckResult>> _runAllChecks() async {
     final results = <String, HealthCheckResult>{};
-    
-    SmartMediaLogger().debug('HealthCheckManager', 'Running ${_healthChecks.length} health checks');
-    
+
+    SmartMediaLogger().debug(
+      'HealthCheckManager',
+      'Running ${_healthChecks.length} health checks',
+    );
+
     for (final entry in _healthChecks.entries) {
       try {
         final startTime = DateTime.now();
         final result = await entry.value.checkFunction();
         final duration = DateTime.now().difference(startTime);
-        
+
         result.duration = duration;
         results[entry.key] = result;
-        
-        SmartMediaLogger().debug('HealthCheckManager', 
+
+        SmartMediaLogger().debug(
+          'HealthCheckManager',
           'Health check ${entry.key}: ${result.status.name} in ${duration.inMilliseconds}ms',
-          {'status': result.status.name, 'duration_ms': duration.inMilliseconds}
+          {
+            'status': result.status.name,
+            'duration_ms': duration.inMilliseconds,
+          },
         );
-        
       } catch (e) {
         results[entry.key] = HealthCheckResult.failed(
           'Health check exception: $e',
           Duration.zero,
         );
-        
-        SmartMediaLogger().error('HealthCheckManager', 'Health check ${entry.key} failed with exception: $e');
+
+        SmartMediaLogger().error(
+          'HealthCheckManager',
+          'Health check ${entry.key} failed with exception: $e',
+        );
       }
     }
-    
+
     return results;
   }
 
@@ -1311,11 +1465,11 @@ class HealthCheckManager {
   /// Obtiene el estado general del sistema
   Future<SystemHealthStatus> getSystemHealth() async {
     final results = await _runAllChecks();
-    
+
     int healthy = 0;
     int degraded = 0;
     int failed = 0;
-    
+
     for (final result in results.values) {
       switch (result.status) {
         case HealthStatus.healthy:
@@ -1329,19 +1483,21 @@ class HealthCheckManager {
           break;
       }
     }
-    
+
     final totalChecks = results.length;
-    SystemHealthStatus overallStatus;
-    
+
+    // Usar la variable healthy para determinar el estado general
     if (failed > 0) {
-      overallStatus = SystemHealthStatus.critical;
-    } else if (degraded > totalChecks * 0.3) { // >30% degraded
-      overallStatus = SystemHealthStatus.degraded;
+      return SystemHealthStatus.critical;
+    } else if (degraded > totalChecks * 0.3) {
+      // >30% degraded
+      return SystemHealthStatus.degraded;
+    } else if (healthy >= totalChecks * 0.7) {
+      // >=70% healthy
+      return SystemHealthStatus.healthy;
     } else {
-      overallStatus = SystemHealthStatus.healthy;
+      return SystemHealthStatus.degraded;
     }
-    
-    return overallStatus;
   }
 
   /// Obtiene estadísticas de health checks
@@ -1360,11 +1516,14 @@ class HealthCheckManager {
       try {
         final stats = await CacheManager.getCacheStats();
         final totalSize = stats['totalCacheSize'] as int;
-        
-        if (totalSize > 2000 * 1024 * 1024) { // >2GB
-          return HealthCheckResult.degraded('Cache size is very large: ${totalSize ~/ (1024 * 1024)}MB');
+
+        if (totalSize > 2000 * 1024 * 1024) {
+          // >2GB
+          return HealthCheckResult.degraded(
+            'Cache size is very large: ${totalSize ~/ (1024 * 1024)}MB',
+          );
         }
-        
+
         return HealthCheckResult.healthy('Cache functioning normally');
       } catch (e) {
         return HealthCheckResult.failed('Cache manager error: $e');
@@ -1381,11 +1540,13 @@ class HealthCheckManager {
           readTimeout: const Duration(seconds: 10),
           validateIntegrity: false,
         );
-        
+
         if (result.success) {
           return HealthCheckResult.healthy('Network connectivity OK');
         } else {
-          return HealthCheckResult.degraded('Network connectivity issues: ${result.errorMessage}');
+          return HealthCheckResult.degraded(
+            'Network connectivity issues: ${result.errorMessage}',
+          );
         }
       } catch (e) {
         return HealthCheckResult.failed('Network connectivity failed: $e');
@@ -1398,21 +1559,29 @@ class HealthCheckManager {
         final metrics = PerformanceMetrics();
         final summary = metrics.getPerformanceSummary();
         final slowOps = summary['topSlowOperations'] as List<dynamic>;
-        
+
         if (slowOps.isNotEmpty) {
           final slowest = slowOps.first['avgDuration'] as double;
-          if (slowest > 10000) { // >10 segundos
-            return HealthCheckResult.degraded('Some operations are very slow: ${slowest.toInt()}ms');
+          if (slowest > 10000) {
+            // >10 segundos
+            return HealthCheckResult.degraded(
+              'Some operations are very slow: ${slowest.toInt()}ms',
+            );
           }
         }
-        
-        return HealthCheckResult.healthy('Performance metrics within acceptable range');
+
+        return HealthCheckResult.healthy(
+          'Performance metrics within acceptable range',
+        );
       } catch (e) {
         return HealthCheckResult.failed('Performance metrics error: $e');
       }
     });
 
-    SmartMediaLogger().info('HealthCheckManager', 'Initialized ${_healthChecks.length} default health checks');
+    SmartMediaLogger().info(
+      'HealthCheckManager',
+      'Initialized ${_healthChecks.length} default health checks',
+    );
   }
 }
 
@@ -1455,14 +1624,14 @@ class HealthCheckResult {
 
 /// Estados de health check
 enum HealthStatus {
-  healthy,  // Funcionando correctamente
+  healthy, // Funcionando correctamente
   degraded, // Funcionando pero con problemas menores
-  failed,   // No funcionando
+  failed, // No funcionando
 }
 
 /// Estado general del sistema
 enum SystemHealthStatus {
-  healthy,  // Todo funcionando bien
+  healthy, // Todo funcionando bien
   degraded, // Algunos problemas pero funcional
   critical, // Problemas graves que afectan funcionalidad
 }
@@ -1615,17 +1784,17 @@ class CacheManager {
 
   CacheConfig _config = const CacheConfig();
   CacheConfig? _originalConfig;
-  
+
   // Gestor de concurrencia de descargas
   late final DownloadConcurrencyManager _downloadManager;
-  
+
   // Gestores de locks y espacio en disco
   late final FileLockManager _fileLockManager;
   late final DiskSpaceManager _diskSpaceManager;
-  
+
   // Gestor de red con timeouts y validación
   late final NetworkStreamManager _networkManager;
-  
+
   // Gestores transversales
   late final SmartMediaLogger _logger;
   late final PerformanceMetrics _performanceMetrics;
@@ -1637,20 +1806,23 @@ class CacheManager {
     _fileLockManager = FileLockManager();
     _diskSpaceManager = DiskSpaceManager();
     _networkManager = NetworkStreamManager();
-    
+
     // Inicializar gestores transversales
     _logger = SmartMediaLogger();
     _performanceMetrics = PerformanceMetrics();
     _adaptiveConfigManager = AdaptiveConfigManager();
     _healthCheckManager = HealthCheckManager();
-    
+
     // Configurar health checks básicos
     _setupBasicHealthChecks();
-    
+
     // Iniciar health checks periódicos
     _healthCheckManager.startPeriodicChecks();
-    
-    _logger.info('CacheManager', 'CacheManager initialized with transversal improvements');
+
+    _logger.info(
+      'CacheManager',
+      'CacheManager initialized with transversal improvements',
+    );
   }
 
   /// Get current cache configuration
@@ -1708,42 +1880,63 @@ class CacheManager {
       try {
         final stats = await getCacheStats();
         final totalSize = stats['totalCacheSize'] as int;
-        final maxSize = _config.maxImageCacheSize + _config.maxVideoCacheSize + _config.maxAudioCacheSize;
-        
-        if (totalSize > maxSize * 1.1) { // 10% tolerance
-          return HealthCheckResult.failed('Cache size exceeded limits', Duration.zero);
+        final maxSize =
+            _config.maxImageCacheSize +
+            _config.maxVideoCacheSize +
+            _config.maxAudioCacheSize;
+
+        if (totalSize > maxSize * 1.1) {
+          // 10% tolerance
+          return HealthCheckResult.failed(
+            'Cache size exceeded limits',
+            Duration.zero,
+          );
         }
-        
+
         return HealthCheckResult.healthy('Cache manager healthy');
       } catch (e) {
-        return HealthCheckResult.failed('Error checking cache: $e', Duration.zero);
+        return HealthCheckResult.failed(
+          'Error checking cache: $e',
+          Duration.zero,
+        );
       }
     });
-    
+
     // Health check para el gestor de descargas
     _healthCheckManager.registerHealthCheck('download_manager', () async {
       final stats = _downloadManager.getStats();
       final activeDownloads = stats['activeDownloads'] as int;
-      final maxConcurrent = (stats['maxAudioConcurrent'] as int) + (stats['maxVideoConcurrent'] as int);
-      
+      final maxConcurrent =
+          (stats['maxAudioConcurrent'] as int) +
+          (stats['maxVideoConcurrent'] as int);
+
       if (activeDownloads > maxConcurrent) {
-        return HealthCheckResult.failed('Too many active downloads', Duration.zero);
+        return HealthCheckResult.failed(
+          'Too many active downloads',
+          Duration.zero,
+        );
       }
-      
+
       return HealthCheckResult.healthy('Download manager healthy');
     });
-    
+
     // Health check para el espacio en disco
     _healthCheckManager.registerHealthCheck('disk_space', () async {
       try {
-        final hasSpace = await _diskSpaceManager.hasEnoughSpace('temp_check', 100 * 1024 * 1024); // 100MB minimum
+        final hasSpace = await _diskSpaceManager.hasEnoughSpace(
+          'temp_check',
+          100 * 1024 * 1024,
+        ); // 100MB minimum
         if (!hasSpace) {
           return HealthCheckResult.failed('Low disk space', Duration.zero);
         }
-        
+
         return HealthCheckResult.healthy('Disk space healthy');
       } catch (e) {
-        return HealthCheckResult.failed('Error checking disk space: $e', Duration.zero);
+        return HealthCheckResult.failed(
+          'Error checking disk space: $e',
+          Duration.zero,
+        );
       }
     });
   }
@@ -1767,7 +1960,9 @@ class CacheManager {
       }
 
       _downloadManager.updateLimits(maxAudio: audioLimit, maxVideo: videoLimit);
-      log('CacheManager: Configured dynamic download limits - Audio: $audioLimit, Video: $videoLimit');
+      log(
+        'CacheManager: Configured dynamic download limits - Audio: $audioLimit, Video: $videoLimit',
+      );
     } catch (e) {
       log('CacheManager: Error configuring dynamic limits: $e');
     }
@@ -2062,7 +2257,10 @@ class CacheManager {
 
     // Verificar si se puede iniciar inmediatamente o si hay que agendar
     if (manager._downloadManager.canStartAudioDownload()) {
-      return await manager._downloadManager.registerAudioDownload(audioUrl, () => _downloadAudioFile(audioUrl));
+      return await manager._downloadManager.registerAudioDownload(
+        audioUrl,
+        () => _downloadAudioFile(audioUrl),
+      );
     } else {
       // Agendar la descarga con prioridad
       final request = _DownloadRequest(
@@ -2079,7 +2277,7 @@ class CacheManager {
   /// Descarga el archivo de audio (método auxiliar) con verificación de espacio y locks
   static Future<String?> _downloadAudioFile(String audioUrl) async {
     final manager = CacheManager.instance;
-    
+
     // Verificar si ya está en caché
     final cachedPath = await getCachedAudioPath(audioUrl);
     if (cachedPath != null) {
@@ -2105,30 +2303,34 @@ class CacheManager {
       // Verificar espacio disponible antes de descargar
       const estimatedSize = 5 * 1024 * 1024; // Estimación conservadora de 5MB
       final hasSpace = await manager._diskSpaceManager.hasEnoughSpace(
-        audioCacheDir.path, 
-        estimatedSize
+        audioCacheDir.path,
+        estimatedSize,
       );
-      
+
       if (!hasSpace) {
-        log('CacheManager: Insufficient disk space for audio download: $audioUrl');
+        log(
+          'CacheManager: Insufficient disk space for audio download: $audioUrl',
+        );
         // Intentar limpiar espacio automáticamente
         await manager._performSmartCleanup(audioType: true);
-        
+
         // Verificar espacio nuevamente después del cleanup
-        final hasSpaceAfterCleanup = await manager._diskSpaceManager.hasEnoughSpace(
-          audioCacheDir.path, 
-          estimatedSize
-        );
-        
+        final hasSpaceAfterCleanup = await manager._diskSpaceManager
+            .hasEnoughSpace(audioCacheDir.path, estimatedSize);
+
         if (!hasSpaceAfterCleanup) {
-          log('CacheManager: Still insufficient space after cleanup for: $audioUrl');
+          log(
+            'CacheManager: Still insufficient space after cleanup for: $audioUrl',
+          );
           return null;
         }
       }
 
       // Intentar adquirir lock de escritura
       if (!manager._fileLockManager.acquireWriteLock(audioFile.path)) {
-        log('CacheManager: Could not acquire write lock for: ${audioFile.path}');
+        log(
+          'CacheManager: Could not acquire write lock for: ${audioFile.path}',
+        );
         return null;
       }
 
@@ -2159,14 +2361,18 @@ class CacheManager {
           );
           return audioFile.path;
         } else {
-          log('CacheManager: Download failed for $audioUrl - ${result.errorMessage}');
-          
+          log(
+            'CacheManager: Download failed for $audioUrl - ${result.errorMessage}',
+          );
+
           // Cleanup automático de archivos parciales/corruptos
           if (await audioFile.exists()) {
             await audioFile.delete();
-            log('CacheManager: Cleaned up partial/corrupted file: ${audioFile.path}');
+            log(
+              'CacheManager: Cleaned up partial/corrupted file: ${audioFile.path}',
+            );
           }
-          
+
           return null;
         }
       } finally {
@@ -2231,7 +2437,10 @@ class CacheManager {
 
     // Verificar si se puede iniciar inmediatamente o si hay que agendar
     if (manager._downloadManager.canStartVideoDownload()) {
-      return await manager._downloadManager.registerVideoDownload(videoUrl, () => _downloadVideoFile(videoUrl));
+      return await manager._downloadManager.registerVideoDownload(
+        videoUrl,
+        () => _downloadVideoFile(videoUrl),
+      );
     } else {
       // Agendar la descarga con prioridad
       final request = _DownloadRequest(
@@ -2246,40 +2455,51 @@ class CacheManager {
   }
 
   /// Realiza limpieza inteligente respetando archivos activos
-  Future<void> _performSmartCleanup({bool audioType = false, bool videoType = false}) async {
-    log('CacheManager: Starting smart cleanup - Audio: $audioType, Video: $videoType');
-    
+  Future<void> _performSmartCleanup({
+    bool audioType = false,
+    bool videoType = false,
+  }) async {
+    log(
+      'CacheManager: Starting smart cleanup - Audio: $audioType, Video: $videoType',
+    );
+
     try {
       if (audioType) {
         final audioCacheDir = await getAudioCacheDirectory();
         const targetReduction = 50 * 1024 * 1024; // 50MB
-        final cleanedSize = await _diskSpaceManager.cleanupFilesRespectingActive(
-          audioCacheDir, 
-          targetReduction
+        final cleanedSize = await _diskSpaceManager
+            .cleanupFilesRespectingActive(audioCacheDir, targetReduction);
+        log(
+          'CacheManager: Smart cleanup audio - Cleaned: ${cleanedSize ~/ 1024}KB',
         );
-        log('CacheManager: Smart cleanup audio - Cleaned: ${cleanedSize ~/ 1024}KB');
       }
-      
+
       if (videoType) {
         final videoCacheDir = await getVideoCacheDirectory();
         const targetReduction = 100 * 1024 * 1024; // 100MB
-        final cleanedSize = await _diskSpaceManager.cleanupFilesRespectingActive(
-          videoCacheDir, 
-          targetReduction
+        final cleanedSize = await _diskSpaceManager
+            .cleanupFilesRespectingActive(videoCacheDir, targetReduction);
+        log(
+          'CacheManager: Smart cleanup video - Cleaned: ${cleanedSize ~/ 1024}KB',
         );
-        log('CacheManager: Smart cleanup video - Cleaned: ${cleanedSize ~/ 1024}KB');
       }
-      
+
       // Si no se especifica tipo, limpiar ambos con moderación
       if (!audioType && !videoType) {
         final audioCacheDir = await getAudioCacheDirectory();
         final videoCacheDir = await getVideoCacheDirectory();
-        
+
         await Future.wait([
-          _diskSpaceManager.cleanupFilesRespectingActive(audioCacheDir, 25 * 1024 * 1024), // 25MB
-          _diskSpaceManager.cleanupFilesRespectingActive(videoCacheDir, 50 * 1024 * 1024), // 50MB
+          _diskSpaceManager.cleanupFilesRespectingActive(
+            audioCacheDir,
+            25 * 1024 * 1024,
+          ), // 25MB
+          _diskSpaceManager.cleanupFilesRespectingActive(
+            videoCacheDir,
+            50 * 1024 * 1024,
+          ), // 50MB
         ]);
-        
+
         log('CacheManager: Smart cleanup completed for both audio and video');
       }
     } catch (e) {
@@ -2290,7 +2510,7 @@ class CacheManager {
   /// Descarga el archivo de video (método auxiliar) con verificación de espacio y locks
   static Future<String?> _downloadVideoFile(String videoUrl) async {
     final manager = CacheManager.instance;
-    
+
     // Verificar si ya está en caché
     final cachedPath = await getCachedVideoPath(videoUrl);
     if (cachedPath != null) {
@@ -2316,30 +2536,34 @@ class CacheManager {
       // Verificar espacio disponible antes de descargar (estimación más alta para videos)
       const estimatedSize = 50 * 1024 * 1024; // Estimación conservadora de 50MB
       final hasSpace = await manager._diskSpaceManager.hasEnoughSpace(
-        videoCacheDir.path, 
-        estimatedSize
+        videoCacheDir.path,
+        estimatedSize,
       );
-      
+
       if (!hasSpace) {
-        log('CacheManager: Insufficient disk space for video download: $videoUrl');
+        log(
+          'CacheManager: Insufficient disk space for video download: $videoUrl',
+        );
         // Intentar limpiar espacio automáticamente
         await manager._performSmartCleanup(videoType: true);
-        
+
         // Verificar espacio nuevamente después del cleanup
-        final hasSpaceAfterCleanup = await manager._diskSpaceManager.hasEnoughSpace(
-          videoCacheDir.path, 
-          estimatedSize
-        );
-        
+        final hasSpaceAfterCleanup = await manager._diskSpaceManager
+            .hasEnoughSpace(videoCacheDir.path, estimatedSize);
+
         if (!hasSpaceAfterCleanup) {
-          log('CacheManager: Still insufficient space after cleanup for: $videoUrl');
+          log(
+            'CacheManager: Still insufficient space after cleanup for: $videoUrl',
+          );
           return null;
         }
       }
 
       // Intentar adquirir lock de escritura
       if (!manager._fileLockManager.acquireWriteLock(videoFile.path)) {
-        log('CacheManager: Could not acquire write lock for: ${videoFile.path}');
+        log(
+          'CacheManager: Could not acquire write lock for: ${videoFile.path}',
+        );
         return null;
       }
 
@@ -2349,7 +2573,9 @@ class CacheManager {
           url: videoUrl,
           destinationFile: videoFile,
           connectTimeout: const Duration(seconds: 45),
-          readTimeout: const Duration(seconds: 300), // 5 minutos para videos grandes
+          readTimeout: const Duration(
+            seconds: 300,
+          ), // 5 minutos para videos grandes
           chunkTimeout: const Duration(seconds: 30),
           validateIntegrity: true,
           onProgress: (downloaded, total) {
@@ -2370,14 +2596,18 @@ class CacheManager {
           );
           return videoFile.path;
         } else {
-          log('CacheManager: Video download failed for $videoUrl - ${result.errorMessage}');
-          
+          log(
+            'CacheManager: Video download failed for $videoUrl - ${result.errorMessage}',
+          );
+
           // Cleanup automático de archivos parciales/corruptos
           if (await videoFile.exists()) {
             await videoFile.delete();
-            log('CacheManager: Cleaned up partial/corrupted video file: ${videoFile.path}');
+            log(
+              'CacheManager: Cleaned up partial/corrupted video file: ${videoFile.path}',
+            );
           }
-          
+
           return null;
         }
       } finally {
@@ -2580,16 +2810,20 @@ class CacheManager {
     try {
       final videoCacheDir = await getVideoCacheDirectory();
       final sizeToRemove = currentSize - _config.maxVideoCacheSize;
-      
-      log('CacheManager: Starting video cleanup - Current: ${currentSize ~/ 1024}KB, Target: ${_config.maxVideoCacheSize ~/ 1024}KB, ToRemove: ${sizeToRemove ~/ 1024}KB');
-      
+
+      log(
+        'CacheManager: Starting video cleanup - Current: ${currentSize ~/ 1024}KB, Target: ${_config.maxVideoCacheSize ~/ 1024}KB, ToRemove: ${sizeToRemove ~/ 1024}KB',
+      );
+
       // Usar el nuevo sistema de cleanup inteligente
       final cleanedSize = await _diskSpaceManager.cleanupFilesRespectingActive(
-        videoCacheDir, 
-        sizeToRemove
+        videoCacheDir,
+        sizeToRemove,
       );
-      
-      log('CacheManager: Video cleanup completed - Cleaned: ${cleanedSize ~/ 1024}KB');
+
+      log(
+        'CacheManager: Video cleanup completed - Cleaned: ${cleanedSize ~/ 1024}KB',
+      );
     } catch (e) {
       log('CacheManager: Error during video cleanup: $e');
     }
@@ -2598,20 +2832,24 @@ class CacheManager {
   /// Cleanup audio cache to reduce size respetando archivos activos y locks
   Future<void> _cleanupAudioCache(int currentSize) async {
     if (currentSize <= _config.maxAudioCacheSize) return;
-    
+
     try {
       final audioCacheDir = await getAudioCacheDirectory();
       final sizeToRemove = currentSize - _config.maxAudioCacheSize;
-      
-      log('CacheManager: Starting audio cleanup - Current: ${currentSize ~/ 1024}KB, Target: ${_config.maxAudioCacheSize ~/ 1024}KB, ToRemove: ${sizeToRemove ~/ 1024}KB');
-      
+
+      log(
+        'CacheManager: Starting audio cleanup - Current: ${currentSize ~/ 1024}KB, Target: ${_config.maxAudioCacheSize ~/ 1024}KB, ToRemove: ${sizeToRemove ~/ 1024}KB',
+      );
+
       // Usar el nuevo sistema de cleanup inteligente
       final cleanedSize = await _diskSpaceManager.cleanupFilesRespectingActive(
-        audioCacheDir, 
-        sizeToRemove
+        audioCacheDir,
+        sizeToRemove,
       );
-      
-      log('CacheManager: Audio cleanup completed - Cleaned: ${cleanedSize ~/ 1024}KB');
+
+      log(
+        'CacheManager: Audio cleanup completed - Cleaned: ${cleanedSize ~/ 1024}KB',
+      );
     } catch (e) {
       log('CacheManager: Error during audio cleanup: $e');
     }
@@ -2706,11 +2944,14 @@ class CacheManager {
 
   /// Realiza cleanup inteligente manual respetando archivos activos
   static Future<void> performSmartCleanup({
-    bool audioType = false, 
+    bool audioType = false,
     bool videoType = false,
   }) async {
     final manager = CacheManager.instance;
-    await manager._performSmartCleanup(audioType: audioType, videoType: videoType);
+    await manager._performSmartCleanup(
+      audioType: audioType,
+      videoType: videoType,
+    );
   }
 
   /// Verifica el espacio disponible en disco para el directorio de cache
@@ -2724,13 +2965,19 @@ class CacheManager {
   static Future<bool> hasEnoughSpace(int requiredBytes) async {
     final manager = CacheManager.instance;
     final tempDir = await getTemporaryDirectory();
-    return await manager._diskSpaceManager.hasEnoughSpace(tempDir.path, requiredBytes);
+    return await manager._diskSpaceManager.hasEnoughSpace(
+      tempDir.path,
+      requiredBytes,
+    );
   }
 
   /// Configura límites de concurrencia de descargas
   static void configureConcurrencyLimits({int? maxAudio, int? maxVideo}) {
     final manager = CacheManager.instance;
-    manager._downloadManager.updateLimits(maxAudio: maxAudio, maxVideo: maxVideo);
+    manager._downloadManager.updateLimits(
+      maxAudio: maxAudio,
+      maxVideo: maxVideo,
+    );
   }
 
   /// Valida un archivo en cache para verificar su integridad
@@ -2751,11 +2998,15 @@ class CacheManager {
       // Intentar leer los primeros bytes para verificar que no esté corrupto
       final bytes = await file.openRead(0, 1024).toList();
       if (bytes.isEmpty) {
-        log('CacheManager: File validation failed - Could not read file: $filePath');
+        log(
+          'CacheManager: File validation failed - Could not read file: $filePath',
+        );
         return false;
       }
 
-      log('CacheManager: File validation successful: $filePath (${fileSize ~/ 1024}KB)');
+      log(
+        'CacheManager: File validation successful: $filePath (${fileSize ~/ 1024}KB)',
+      );
       return true;
     } catch (e) {
       log('CacheManager: File validation error: $e');
@@ -2766,7 +3017,7 @@ class CacheManager {
   /// Limpia archivos corruptos o parciales del cache
   static Future<int> cleanupCorruptedFiles() async {
     int cleanedFiles = 0;
-    
+
     try {
       final dirs = [
         await getAudioCacheDirectory(),
@@ -2786,7 +3037,9 @@ class CacheManager {
                 cleanedFiles++;
                 log('CacheManager: Cleaned corrupted file: ${entity.path}');
               } catch (e) {
-                log('CacheManager: Error cleaning corrupted file ${entity.path}: $e');
+                log(
+                  'CacheManager: Error cleaning corrupted file ${entity.path}: $e',
+                );
               }
             }
           }
@@ -2796,7 +3049,9 @@ class CacheManager {
       log('CacheManager: Error during corrupted files cleanup: $e');
     }
 
-    log('CacheManager: Corrupted files cleanup completed - Cleaned: $cleanedFiles files');
+    log(
+      'CacheManager: Corrupted files cleanup completed - Cleaned: $cleanedFiles files',
+    );
     return cleanedFiles;
   }
 
@@ -2805,7 +3060,9 @@ class CacheManager {
     final manager = CacheManager.instance;
     return {
       'networkManagerStats': manager._networkManager.getStats(),
-      'supportedErrorTypes': DownloadError.values.map((e) => e.toString()).toList(),
+      'supportedErrorTypes': DownloadError.values
+          .map((e) => e.toString())
+          .toList(),
       'defaultTimeouts': {
         'connectSeconds': NetworkStreamManager.defaultConnectTimeout.inSeconds,
         'readSeconds': NetworkStreamManager.defaultReadTimeout.inSeconds,
@@ -2826,7 +3083,7 @@ class CacheManager {
   }) async {
     final manager = CacheManager.instance;
     final file = File(destinationPath);
-    
+
     return await manager._networkManager.downloadFileWithValidation(
       url: url,
       destinationFile: file,
@@ -2877,8 +3134,14 @@ class CacheManager {
   }
 
   /// Configura el perfil de dispositivo manualmente
-  static void setDeviceProfile(DeviceProfile profile, {bool disableAutoAdaptation = false}) {
-    CacheManager.instance._adaptiveConfigManager.setProfile(profile, disableAutoAdaptation: disableAutoAdaptation);
+  static void setDeviceProfile(
+    DeviceProfile profile, {
+    bool disableAutoAdaptation = false,
+  }) {
+    CacheManager.instance._adaptiveConfigManager.setProfile(
+      profile,
+      disableAutoAdaptation: disableAutoAdaptation,
+    );
   }
 
   /// Habilita/deshabilita la adaptación automática de configuración
@@ -2897,17 +3160,16 @@ class CacheManager {
   }
 
   /// Configura health checks periódicos
-  static void configureHealthChecks({
-    Duration? interval,
-    bool? enabled,
-  }) {
+  static void configureHealthChecks({Duration? interval, bool? enabled}) {
     final healthManager = CacheManager.instance._healthCheckManager;
-    
+
     if (enabled == false) {
       healthManager.stopPeriodicChecks();
     } else if (enabled == true || interval != null) {
       healthManager.stopPeriodicChecks();
-      healthManager.startPeriodicChecks(interval: interval ?? const Duration(minutes: 5));
+      healthManager.startPeriodicChecks(
+        interval: interval ?? const Duration(minutes: 5),
+      );
     }
   }
 
@@ -2916,13 +3178,16 @@ class CacheManager {
     String name,
     Future<HealthCheckResult> Function() checkFunction,
   ) {
-    CacheManager.instance._healthCheckManager.registerHealthCheck(name, checkFunction);
+    CacheManager.instance._healthCheckManager.registerHealthCheck(
+      name,
+      checkFunction,
+    );
   }
 
   /// Obtiene estadísticas completas del sistema transversal
   static Future<Map<String, dynamic>> getTransversalStats() async {
     final manager = CacheManager.instance;
-    
+
     return {
       'logging': manager._logger.getStats(),
       'performance': manager._performanceMetrics.getAllMetrics(),

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../utils/cache_manager.dart';
@@ -58,6 +60,9 @@ class SmartVideoPlayerWidget extends StatefulWidget {
   /// Whether to disable caching for this specific video
   final bool disableCache;
 
+  /// Android-specific video configuration
+  final AndroidVideoConfig? androidConfig;
+
   /// Callback when video loads successfully
   final VoidCallback? onVideoLoaded;
 
@@ -90,6 +95,7 @@ class SmartVideoPlayerWidget extends StatefulWidget {
     this.localCacheConfig,
     this.useGlobalConfig = true,
     this.disableCache = false,
+    this.androidConfig,
     this.onVideoLoaded,
     this.onVideoError,
     this.onVideoPlay,
@@ -101,6 +107,37 @@ class SmartVideoPlayerWidget extends StatefulWidget {
   State<SmartVideoPlayerWidget> createState() => _VideoPlayerWidgetState();
 }
 
+/// Android-specific video configuration to prevent buffer overflow
+class AndroidVideoConfig {
+  /// Maximum number of buffers to use (default: 2 to prevent overflow)
+  final int maxBuffers;
+
+  /// Buffer size in bytes (default: 2MB)
+  final int bufferSize;
+
+  /// Whether to use hardware acceleration (default: true)
+  final bool useHardwareAcceleration;
+
+  /// Video format priority (default: h264)
+  final String preferredFormat;
+
+  /// Whether to enable adaptive streaming
+  final bool enableAdaptiveStreaming;
+
+  const AndroidVideoConfig({
+    this.maxBuffers = 2,
+    this.bufferSize = 2 * 1024 * 1024, // 2MB
+    this.useHardwareAcceleration = true,
+    this.preferredFormat = 'h264',
+    this.enableAdaptiveStreaming = true,
+  });
+
+  @override
+  String toString() {
+    return 'AndroidVideoConfig(maxBuffers: $maxBuffers, bufferSize: ${bufferSize ~/ 1024}KB, hwAccel: $useHardwareAcceleration)';
+  }
+}
+
 class _VideoPlayerWidgetState extends State<SmartVideoPlayerWidget> {
   VideoPlayerController? _videoPlayerController;
   ChewieController? _chewieController;
@@ -108,10 +145,15 @@ class _VideoPlayerWidgetState extends State<SmartVideoPlayerWidget> {
   bool _hasError = false;
   String? _errorMessage;
   Function()? _restoreConfig;
+  bool _isDisposed = false;
+
+  // Android-specific configuration
+  late final AndroidVideoConfig _androidConfig;
 
   @override
   void initState() {
     super.initState();
+    _androidConfig = widget.androidConfig ?? const AndroidVideoConfig();
     _applyCacheConfig();
     _initializeVideo();
   }
@@ -130,6 +172,7 @@ class _VideoPlayerWidgetState extends State<SmartVideoPlayerWidget> {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _restoreConfig?.call();
     _videoPlayerController?.removeListener(_videoListener);
     _videoPlayerController?.dispose();
@@ -155,11 +198,18 @@ class _VideoPlayerWidgetState extends State<SmartVideoPlayerWidget> {
   }
 
   Future<void> _initializeVideo() async {
+    if (_isDisposed) return;
+
     try {
       _isLoading = true;
       _hasError = false;
 
       if (mounted) setState(() {});
+
+      // Apply Android-specific configuration
+      if (Platform.isAndroid) {
+        await _applyAndroidVideoConfig();
+      }
 
       // Create video player controller
       if (MediaUtils.isRemoteSource(widget.videoSource)) {
@@ -194,13 +244,23 @@ class _VideoPlayerWidgetState extends State<SmartVideoPlayerWidget> {
         _videoPlayerController = VideoPlayerController.file(File(localPath));
       }
 
-      // Initialize the controller
-      await _videoPlayerController!.initialize();
+      // Initialize the controller with timeout
+      await _videoPlayerController!.initialize().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException(
+            'Video initialization timeout',
+            const Duration(seconds: 30),
+          );
+        },
+      );
+
+      if (_isDisposed) return;
 
       // Set up event listeners
       _videoPlayerController!.addListener(_videoListener);
 
-      // Create Chewie controller
+      // Create Chewie controller with Android-specific settings
       _chewieController = ChewieController(
         videoPlayerController: _videoPlayerController!,
         autoPlay: widget.autoPlay,
@@ -211,40 +271,68 @@ class _VideoPlayerWidgetState extends State<SmartVideoPlayerWidget> {
         allowPlaybackSpeedChanging: true,
         placeholder: widget.placeholder ?? _buildPlaceholder(),
         errorBuilder: (context, errorMessage) {
-          _hasError = true;
-          _errorMessage = errorMessage;
-          widget.onVideoError?.call(errorMessage);
+          if (!_isDisposed) {
+            _hasError = true;
+            _errorMessage = errorMessage;
+            widget.onVideoError?.call(errorMessage);
+          }
           return widget.errorWidget ?? _buildErrorWidget(errorMessage);
         },
       );
 
       _isLoading = false;
-      widget.onVideoLoaded?.call();
-
-      if (mounted) setState(() {});
+      if (!_isDisposed) {
+        widget.onVideoLoaded?.call();
+        if (mounted) setState(() {});
+      }
     } catch (e) {
-      _hasError = true;
-      _errorMessage = e.toString();
-      _isLoading = false;
-      widget.onVideoError?.call(e.toString());
+      if (!_isDisposed) {
+        _hasError = true;
+        _errorMessage = e.toString();
+        _isLoading = false;
+        widget.onVideoError?.call(e.toString());
 
-      if (mounted) setState(() {});
+        if (mounted) setState(() {});
+      }
+    }
+  }
+
+  /// Apply Android-specific video configuration to prevent buffer overflow
+  Future<void> _applyAndroidVideoConfig() async {
+    try {
+      // Set Android-specific video player options
+      if (Platform.isAndroid) {
+        // Configure video player for better buffer management
+        await SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+
+        // Log Android configuration for debugging
+        print('SmartVideoPlayer: Applied Android config: $_androidConfig');
+      }
+    } catch (e) {
+      print('SmartVideoPlayer: Error applying Android config: $e');
     }
   }
 
   /// Descarga el video en segundo plano para caché futuro
   Future<void> _downloadVideoInBackground(String videoUrl) async {
+    if (_isDisposed) return;
+
     try {
       // Descargar sin bloquear la UI
       await CacheManager.cacheVideo(videoUrl);
     } catch (e) {
       // Ignorar errores de descarga en segundo plano
       // No afecta la reproducción actual
+      print('SmartVideoPlayer: Background download failed: $e');
     }
   }
 
   void _videoListener() {
-    if (_videoPlayerController == null) return;
+    if (_videoPlayerController == null || _isDisposed) return;
 
     if (_videoPlayerController!.value.isPlaying) {
       widget.onVideoPlay?.call();

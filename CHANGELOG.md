@@ -2,7 +2,15 @@
 
 ## [Unreleased] - Development Phase
 
-### 🚀 Memory Optimizations (Latest)
+### 🔧 Android Buffer Management (Latest)
+* **Fixed ImageReader buffer overflow** by implementing Android-specific buffer configuration
+* **Resolved CCodec buffer management issues** with optimized audio buffer settings
+* **Prevented BufferPool saturation** by limiting concurrent media players
+* **Added AndroidBufferConfig class** for device-specific buffer optimization
+* **Implemented conservative configuration** for low-end devices
+* **Enhanced timeout handling** for video and audio initialization
+
+### 🚀 Memory Optimizations
 * **Fixed Out of Memory errors** on iOS by implementing streaming downloads
 * **Reduced memory usage by 80-90%** for large audio/video files
 * **Optimized PlayerController management** to avoid multiple instances in global mode

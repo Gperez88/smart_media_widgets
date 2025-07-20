@@ -5,27 +5,28 @@ import 'dart:math' as math;
 
 import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:flutter/material.dart';
+import '../../utils/media_utils.dart';
 
 /// Configuración para timeouts y reintentos de red
 class NetworkConfig {
   /// Timeout base en segundos
   final int baseTimeoutSeconds;
-  
+
   /// Timeout adicional por MB de archivo estimado
   final int timeoutPerMBSeconds;
-  
+
   /// Número máximo de reintentos
   final int maxRetries;
-  
+
   /// Factor de backoff exponencial
   final double backoffFactor;
-  
+
   /// Delay inicial en milisegundos para el primer reintento
   final int initialDelayMs;
-  
+
   /// Timeout máximo absoluto en segundos
   final int maxTimeoutSeconds;
-  
+
   /// Detectar cambios de conectividad
   final bool enableConnectivityDetection;
 
@@ -45,13 +46,16 @@ class NetworkConfig {
     if (estimatedSizeMB == null || estimatedSizeMB <= 0) {
       return baseDuration;
     }
-    
+
     final additionalSeconds = (estimatedSizeMB * timeoutPerMBSeconds);
-    final totalSeconds = math.min(baseTimeoutSeconds + additionalSeconds, maxTimeoutSeconds);
-    
+    final totalSeconds = math.min(
+      baseTimeoutSeconds + additionalSeconds,
+      maxTimeoutSeconds,
+    );
+
     return Duration(seconds: totalSeconds);
   }
-  
+
   /// Calcula delay para reintento con backoff exponencial
   Duration calculateRetryDelay(int attemptNumber) {
     final delay = initialDelayMs * math.pow(backoffFactor, attemptNumber - 1);
@@ -97,20 +101,26 @@ class GlobalAudioInfo {
     try {
       positionSubscription?.cancel();
     } catch (e) {
-      log('GlobalAudioInfo: Error canceling position subscription for $playerId: $e');
+      log(
+        'GlobalAudioInfo: Error canceling position subscription for $playerId: $e',
+      );
     }
-    
+
     try {
       waveformSubscription?.cancel();
     } catch (e) {
-      log('GlobalAudioInfo: Error canceling waveform subscription for $playerId: $e');
+      log(
+        'GlobalAudioInfo: Error canceling waveform subscription for $playerId: $e',
+      );
     }
-    
+
     // Dispose del player controller de manera segura
     try {
       playerController.dispose();
     } catch (e) {
-      log('GlobalAudioInfo: Error disposing player controller for $playerId: $e');
+      log(
+        'GlobalAudioInfo: Error disposing player controller for $playerId: $e',
+      );
     }
   }
 }
@@ -130,7 +140,7 @@ class GlobalAudioPlayerManager {
   // Mutex para operaciones críticas
   final Map<String, Completer<void>> _preparingAudios = {};
   final Map<String, bool> _operationLocks = {};
-  
+
   // Mutex para sincronización de callbacks
   final Map<String, bool> _callbackLocks = {};
 
@@ -212,15 +222,19 @@ class GlobalAudioPlayerManager {
 
     _lastNetworkError = DateTime.now();
     _consecutiveNetworkErrors++;
-    
+
     // Considerar desconectado después de 3 errores consecutivos
     if (_consecutiveNetworkErrors >= 3) {
       _isConnected = false;
-      log('GlobalAudioPlayerManager: Network connectivity lost ($_consecutiveNetworkErrors consecutive errors)');
+      log(
+        'GlobalAudioPlayerManager: Network connectivity lost ($_consecutiveNetworkErrors consecutive errors)',
+      );
     }
-    
-    log('GlobalAudioPlayerManager: Network error recorded: $error (consecutive: $_consecutiveNetworkErrors)');
-    
+
+    log(
+      'GlobalAudioPlayerManager: Network error recorded: $error (consecutive: $_consecutiveNetworkErrors)',
+    );
+
     // Adaptar configuración automáticamente
     adaptNetworkConfig();
   }
@@ -234,7 +248,7 @@ class GlobalAudioPlayerManager {
       _consecutiveNetworkErrors = 0;
       _lastNetworkError = null;
       log('GlobalAudioPlayerManager: Network connectivity recovered');
-      
+
       // Adaptar configuración automáticamente tras recuperación
       adaptNetworkConfig();
     }
@@ -244,13 +258,13 @@ class GlobalAudioPlayerManager {
   bool _isNetworkError(dynamic error) {
     if (error is TimeoutException) return true;
     if (error is SocketException) return true;
-    
+
     final errorString = error.toString().toLowerCase();
     return errorString.contains('network') ||
-           errorString.contains('connection') ||
-           errorString.contains('timeout') ||
-           errorString.contains('unreachable') ||
-           errorString.contains('dns');
+        errorString.contains('connection') ||
+        errorString.contains('timeout') ||
+        errorString.contains('unreachable') ||
+        errorString.contains('dns');
   }
 
   /// Adapta automáticamente la configuración de red basada en condiciones actuales
@@ -258,8 +272,9 @@ class GlobalAudioPlayerManager {
     if (!_networkConfig.enableConnectivityDetection) return;
 
     final now = DateTime.now();
-    final hasRecentErrors = _lastNetworkError != null && 
-                           now.difference(_lastNetworkError!).inMinutes < 5;
+    final hasRecentErrors =
+        _lastNetworkError != null &&
+        now.difference(_lastNetworkError!).inMinutes < 5;
 
     NetworkConfig newConfig;
 
@@ -274,8 +289,9 @@ class GlobalAudioPlayerManager {
         maxTimeoutSeconds: math.min(_networkConfig.maxTimeoutSeconds * 2, 120),
         enableConnectivityDetection: _networkConfig.enableConnectivityDetection,
       );
-      log('GlobalAudioPlayerManager: Adapted to unstable network configuration');
-      
+      log(
+        'GlobalAudioPlayerManager: Adapted to unstable network configuration',
+      );
     } else if (hasRecentErrors) {
       // Red con errores recientes: configuración intermedia
       newConfig = NetworkConfig(
@@ -288,16 +304,27 @@ class GlobalAudioPlayerManager {
         enableConnectivityDetection: _networkConfig.enableConnectivityDetection,
       );
       log('GlobalAudioPlayerManager: Adapted to moderate network conditions');
-      
     } else {
       // Red estable: usar configuración original o optimizada
       const baseConfig = NetworkConfig();
       newConfig = NetworkConfig(
-        baseTimeoutSeconds: math.min(_networkConfig.baseTimeoutSeconds, baseConfig.baseTimeoutSeconds),
-        timeoutPerMBSeconds: math.min(_networkConfig.timeoutPerMBSeconds, baseConfig.timeoutPerMBSeconds),
+        baseTimeoutSeconds: math.min(
+          _networkConfig.baseTimeoutSeconds,
+          baseConfig.baseTimeoutSeconds,
+        ),
+        timeoutPerMBSeconds: math.min(
+          _networkConfig.timeoutPerMBSeconds,
+          baseConfig.timeoutPerMBSeconds,
+        ),
         maxRetries: math.min(_networkConfig.maxRetries, baseConfig.maxRetries),
-        backoffFactor: math.min(_networkConfig.backoffFactor, baseConfig.backoffFactor),
-        initialDelayMs: math.min(_networkConfig.initialDelayMs, baseConfig.initialDelayMs),
+        backoffFactor: math.min(
+          _networkConfig.backoffFactor,
+          baseConfig.backoffFactor,
+        ),
+        initialDelayMs: math.min(
+          _networkConfig.initialDelayMs,
+          baseConfig.initialDelayMs,
+        ),
         maxTimeoutSeconds: _networkConfig.maxTimeoutSeconds,
         enableConnectivityDetection: _networkConfig.enableConnectivityDetection,
       );
@@ -313,8 +340,8 @@ class GlobalAudioPlayerManager {
   /// Obtiene estadísticas de red para monitoreo
   Map<String, dynamic> getNetworkStats() {
     final now = DateTime.now();
-    final minutesSinceLastError = _lastNetworkError != null 
-        ? now.difference(_lastNetworkError!).inMinutes 
+    final minutesSinceLastError = _lastNetworkError != null
+        ? now.difference(_lastNetworkError!).inMinutes
         : null;
 
     return {
@@ -342,7 +369,7 @@ class GlobalAudioPlayerManager {
   void _releaseOperationLock(String playerId) {
     final completer = _preparingAudios.remove(playerId);
     _operationLocks.remove(playerId);
-    
+
     if (completer != null && !completer.isCompleted) {
       completer.complete();
     }
@@ -351,20 +378,24 @@ class GlobalAudioPlayerManager {
   /// Ejecuta callbacks de manera segura
   void _safeExecuteCallbacks(String playerId, List<VoidCallback>? callbacks) {
     if (callbacks == null || callbacks.isEmpty) return;
-    
+
     // Evitar ejecución concurrente de callbacks para el mismo playerId
     if (_callbackLocks[playerId] == true) {
-      log('GlobalAudioPlayerManager: Skipping callback execution, already in progress for: $playerId');
+      log(
+        'GlobalAudioPlayerManager: Skipping callback execution, already in progress for: $playerId',
+      );
       return;
     }
-    
+
     _callbackLocks[playerId] = true;
     try {
       for (final callback in List.from(callbacks)) {
         try {
           callback();
         } catch (e) {
-          log('GlobalAudioPlayerManager: Error executing callback for $playerId: $e');
+          log(
+            'GlobalAudioPlayerManager: Error executing callback for $playerId: $e',
+          );
         }
       }
     } finally {
@@ -373,22 +404,30 @@ class GlobalAudioPlayerManager {
   }
 
   /// Ejecuta callbacks con parámetros de manera segura
-  void _safeExecuteParameterCallbacks<T>(String playerId, List<Function(T)>? callbacks, T parameter) {
+  void _safeExecuteParameterCallbacks<T>(
+    String playerId,
+    List<Function(T)>? callbacks,
+    T parameter,
+  ) {
     if (callbacks == null || callbacks.isEmpty) return;
-    
+
     // Evitar ejecución concurrente de callbacks para el mismo playerId
     if (_callbackLocks[playerId] == true) {
-      log('GlobalAudioPlayerManager: Skipping parameter callback execution, already in progress for: $playerId');
+      log(
+        'GlobalAudioPlayerManager: Skipping parameter callback execution, already in progress for: $playerId',
+      );
       return;
     }
-    
+
     _callbackLocks[playerId] = true;
     try {
       for (final callback in List.from(callbacks)) {
         try {
           callback(parameter);
         } catch (e) {
-          log('GlobalAudioPlayerManager: Error executing parameter callback for $playerId: $e');
+          log(
+            'GlobalAudioPlayerManager: Error executing parameter callback for $playerId: $e',
+          );
         }
       }
     } finally {
@@ -397,16 +436,22 @@ class GlobalAudioPlayerManager {
   }
 
   /// Agrega un callback a una lista con límite máximo
-  void _addCallbackWithLimit<T>(Map<String, List<T>> callbackMap, String playerId, T callback) {
+  void _addCallbackWithLimit<T>(
+    Map<String, List<T>> callbackMap,
+    String playerId,
+    T callback,
+  ) {
     callbackMap[playerId] ??= [];
     final callbacks = callbackMap[playerId]!;
-    
+
     // Si se alcanza el límite, remover el más antiguo
     if (callbacks.length >= _maxCallbacksPerPlayer) {
       callbacks.removeAt(0);
-      log('GlobalAudioPlayerManager: Callback limit reached for $playerId, removing oldest callback');
+      log(
+        'GlobalAudioPlayerManager: Callback limit reached for $playerId, removing oldest callback',
+      );
     }
-    
+
     callbacks.add(callback);
   }
 
@@ -428,14 +473,28 @@ class GlobalAudioPlayerManager {
     final allValidPlayerIds = activePlayerIds.union(preparingPlayerIds);
 
     // Limpiar callbacks para playerIds que ya no están activos ni preparándose
-    _onPlayCallbacks.removeWhere((playerId, _) => !allValidPlayerIds.contains(playerId));
-    _onPauseCallbacks.removeWhere((playerId, _) => !allValidPlayerIds.contains(playerId));
-    _onStopCallbacks.removeWhere((playerId, _) => !allValidPlayerIds.contains(playerId));
-    _onPositionChangedCallbacks.removeWhere((playerId, _) => !allValidPlayerIds.contains(playerId));
-    _onWaveformDataCallbacks.removeWhere((playerId, _) => !allValidPlayerIds.contains(playerId));
-    _callbackLocks.removeWhere((playerId, _) => !allValidPlayerIds.contains(playerId));
+    _onPlayCallbacks.removeWhere(
+      (playerId, _) => !allValidPlayerIds.contains(playerId),
+    );
+    _onPauseCallbacks.removeWhere(
+      (playerId, _) => !allValidPlayerIds.contains(playerId),
+    );
+    _onStopCallbacks.removeWhere(
+      (playerId, _) => !allValidPlayerIds.contains(playerId),
+    );
+    _onPositionChangedCallbacks.removeWhere(
+      (playerId, _) => !allValidPlayerIds.contains(playerId),
+    );
+    _onWaveformDataCallbacks.removeWhere(
+      (playerId, _) => !allValidPlayerIds.contains(playerId),
+    );
+    _callbackLocks.removeWhere(
+      (playerId, _) => !allValidPlayerIds.contains(playerId),
+    );
 
-    log('GlobalAudioPlayerManager: Cleaned up orphaned callbacks. Active players: ${activePlayerIds.length}, Preparing: ${preparingPlayerIds.length}');
+    log(
+      'GlobalAudioPlayerManager: Cleaned up orphaned callbacks. Active players: ${activePlayerIds.length}, Preparing: ${preparingPlayerIds.length}',
+    );
   }
 
   /// Ejecuta limpieza automática de callbacks huérfanos periódicamente
@@ -444,12 +503,14 @@ class GlobalAudioPlayerManager {
     if (_cleanupTimer?.isActive != true) {
       _cleanupTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
         _cleanupOrphanedCallbacks();
-        
+
         // Si no hay audios activos ni preparándose, cancelar el timer
         if (_activeAudios.isEmpty && _preparingAudios.isEmpty) {
           timer.cancel();
           _cleanupTimer = null;
-          log('GlobalAudioPlayerManager: Canceled orphaned callback cleanup timer');
+          log(
+            'GlobalAudioPlayerManager: Canceled orphaned callback cleanup timer',
+          );
         }
       });
       log('GlobalAudioPlayerManager: Started orphaned callback cleanup timer');
@@ -463,15 +524,23 @@ class GlobalAudioPlayerManager {
     required bool shouldExtractWaveform,
     int? estimatedSizeMB,
   }) async {
-    final timeout = _networkConfig.calculateTimeout(estimatedSizeMB: estimatedSizeMB);
-    
+    final timeout = _networkConfig.calculateTimeout(
+      estimatedSizeMB: estimatedSizeMB,
+    );
+
     for (int attempt = 1; attempt <= _networkConfig.maxRetries + 1; attempt++) {
       try {
-        log('GlobalAudioPlayerManager: Preparing audio attempt $attempt/${_networkConfig.maxRetries + 1} for: $audioSource (timeout: ${timeout.inSeconds}s)');
-        
+        log(
+          'GlobalAudioPlayerManager: Preparing audio attempt $attempt/${_networkConfig.maxRetries + 1} for: $audioSource (timeout: ${timeout.inSeconds}s)',
+        );
+
+        // Get the appropriate source path (download if remote)
+        final sourcePath = await MediaUtils.getAudioSourcePath(audioSource);
+        log('GlobalAudioPlayerManager: Using source path: $sourcePath');
+
         await playerController
             .preparePlayer(
-              path: audioSource,
+              path: sourcePath,
               shouldExtractWaveform: shouldExtractWaveform,
             )
             .timeout(
@@ -483,35 +552,40 @@ class GlobalAudioPlayerManager {
                 );
               },
             );
-        
+
         // Si llegamos aquí, la preparación fue exitosa
-        log('GlobalAudioPlayerManager: Audio prepared successfully on attempt $attempt for: $audioSource');
+        log(
+          'GlobalAudioPlayerManager: Audio prepared successfully on attempt $attempt for: $audioSource',
+        );
         _recordNetworkRecovery();
         return;
-        
       } catch (e) {
         final isLastAttempt = attempt > _networkConfig.maxRetries;
         final isNetworkRelated = _isNetworkError(e);
-        
+
         if (isNetworkRelated) {
           _recordNetworkError(e);
         }
-        
+
         if (isLastAttempt) {
-          log('GlobalAudioPlayerManager: All attempts failed for: $audioSource. Last error: $e');
+          log(
+            'GlobalAudioPlayerManager: All attempts failed for: $audioSource. Last error: $e',
+          );
           rethrow;
         }
-        
+
         // Calcular delay para el siguiente intento
         final delay = _networkConfig.calculateRetryDelay(attempt);
-        
+
         // Si hay problemas de conectividad, usar delay más largo
-        final adjustedDelay = isNetworkRelated && !_isConnected 
+        final adjustedDelay = isNetworkRelated && !_isConnected
             ? Duration(milliseconds: (delay.inMilliseconds * 2).round())
             : delay;
-            
-        log('GlobalAudioPlayerManager: Attempt $attempt failed for: $audioSource. Retrying in ${adjustedDelay.inMilliseconds}ms. Error: $e');
-        
+
+        log(
+          'GlobalAudioPlayerManager: Attempt $attempt failed for: $audioSource. Retrying in ${adjustedDelay.inMilliseconds}ms. Error: $e',
+        );
+
         // Esperar antes del siguiente intento
         await Future.delayed(adjustedDelay);
       }
@@ -592,14 +666,19 @@ class GlobalAudioPlayerManager {
         }
 
         // Configurar listeners
-        positionSubscription = playerController.onCurrentDurationChanged
-            .listen((durationInMillis) {
-              final newPosition = Duration(milliseconds: durationInMillis);
-              position.value = newPosition;
+        positionSubscription = playerController.onCurrentDurationChanged.listen(
+          (durationInMillis) {
+            final newPosition = Duration(milliseconds: durationInMillis);
+            position.value = newPosition;
 
-              // Notificar callbacks
-              _safeExecuteParameterCallbacks(playerId, _onPositionChangedCallbacks[playerId], newPosition);
-            });
+            // Notificar callbacks
+            _safeExecuteParameterCallbacks(
+              playerId,
+              _onPositionChangedCallbacks[playerId],
+              newPosition,
+            );
+          },
+        );
 
         if (shouldExtractWaveform) {
           waveformSubscription = playerController.onCurrentExtractedWaveformData
@@ -607,7 +686,11 @@ class GlobalAudioPlayerManager {
                 waveformData.value = data;
 
                 // Notificar callbacks
-                _safeExecuteParameterCallbacks(playerId, _onWaveformDataCallbacks[playerId], data);
+                _safeExecuteParameterCallbacks(
+                  playerId,
+                  _onWaveformDataCallbacks[playerId],
+                  data,
+                );
               });
         }
 
@@ -637,19 +720,23 @@ class GlobalAudioPlayerManager {
         );
       } catch (e) {
         // Limpiar recursos si hay error durante la preparación
-        log('GlobalAudioPlayerManager: Error during preparation, cleaning up resources for: $playerId');
-        
+        log(
+          'GlobalAudioPlayerManager: Error during preparation, cleaning up resources for: $playerId',
+        );
+
         // Cancelar subscripciones si fueron creadas
         await positionSubscription?.cancel();
         await waveformSubscription?.cancel();
-        
+
         // Intentar dispose del player controller
         try {
           playerController.dispose();
         } catch (disposeError) {
-          log('GlobalAudioPlayerManager: Error disposing playerController: $disposeError');
+          log(
+            'GlobalAudioPlayerManager: Error disposing playerController: $disposeError',
+          );
         }
-        
+
         rethrow;
       }
     } catch (e) {
@@ -665,7 +752,9 @@ class GlobalAudioPlayerManager {
   Future<void> play(String playerId) async {
     // Verificar si el audio está en preparación
     if (isAudioPreparing(playerId)) {
-      log('GlobalAudioPlayerManager: Audio is still preparing for playerId: $playerId');
+      log(
+        'GlobalAudioPlayerManager: Audio is still preparing for playerId: $playerId',
+      );
       return;
     }
 
@@ -715,7 +804,10 @@ class GlobalAudioPlayerManager {
           otherAudioInfo.isPlaying.value = false;
 
           // Notificar callbacks de pausa
-          _safeExecuteCallbacks(otherPlayerId, _onPauseCallbacks[otherPlayerId]);
+          _safeExecuteCallbacks(
+            otherPlayerId,
+            _onPauseCallbacks[otherPlayerId],
+          );
 
           log(
             'GlobalAudioPlayerManager: Paused other global audio: $otherPlayerId',
@@ -733,7 +825,9 @@ class GlobalAudioPlayerManager {
   Future<void> pause(String playerId) async {
     // Verificar si el audio está en preparación
     if (isAudioPreparing(playerId)) {
-      log('GlobalAudioPlayerManager: Audio is still preparing for playerId: $playerId');
+      log(
+        'GlobalAudioPlayerManager: Audio is still preparing for playerId: $playerId',
+      );
       return;
     }
 
@@ -763,7 +857,9 @@ class GlobalAudioPlayerManager {
   Future<void> stop(String playerId) async {
     // Verificar si el audio está en preparación
     if (isAudioPreparing(playerId)) {
-      log('GlobalAudioPlayerManager: Audio is still preparing, waiting to stop for playerId: $playerId');
+      log(
+        'GlobalAudioPlayerManager: Audio is still preparing, waiting to stop for playerId: $playerId',
+      );
       // Esperar a que termine la preparación antes de detener
       await _preparingAudios[playerId]?.future;
     }
@@ -784,7 +880,9 @@ class GlobalAudioPlayerManager {
           await audioInfo.playerController.stopPlayer();
           playerStopped = true;
         } catch (e) {
-          log('GlobalAudioPlayerManager: Error stopping player for $playerId: $e');
+          log(
+            'GlobalAudioPlayerManager: Error stopping player for $playerId: $e',
+          );
           // Continuar con cleanup aunque falle el stop
         }
       } else {
@@ -793,7 +891,6 @@ class GlobalAudioPlayerManager {
 
       // Notificar callbacks antes de eliminar (independientemente del estado del player)
       _safeExecuteCallbacks(playerId, _onStopCallbacks[playerId]);
-
     } finally {
       // Garantizar limpieza de recursos incluso si hay errores
       try {
@@ -801,7 +898,9 @@ class GlobalAudioPlayerManager {
         audioInfo.dispose();
         resourcesDisposed = true;
       } catch (e) {
-        log('GlobalAudioPlayerManager: Error disposing resources for $playerId: $e');
+        log(
+          'GlobalAudioPlayerManager: Error disposing resources for $playerId: $e',
+        );
       }
 
       // Eliminar de la lista (siempre)
@@ -818,9 +917,13 @@ class GlobalAudioPlayerManager {
       _activeAudiosController.add(_activeAudios.values.toList());
 
       if (playerStopped && resourcesDisposed) {
-        log('GlobalAudioPlayerManager: Audio stopped and removed successfully for playerId: $playerId');
+        log(
+          'GlobalAudioPlayerManager: Audio stopped and removed successfully for playerId: $playerId',
+        );
       } else {
-        log('GlobalAudioPlayerManager: Audio removed with partial cleanup for playerId: $playerId (player stopped: $playerStopped, resources disposed: $resourcesDisposed)');
+        log(
+          'GlobalAudioPlayerManager: Audio removed with partial cleanup for playerId: $playerId (player stopped: $playerStopped, resources disposed: $resourcesDisposed)',
+        );
       }
     }
   }
@@ -829,7 +932,9 @@ class GlobalAudioPlayerManager {
   Future<void> seekTo(String playerId, Duration position) async {
     // Verificar si el audio está en preparación
     if (isAudioPreparing(playerId)) {
-      log('GlobalAudioPlayerManager: Audio is still preparing for playerId: $playerId');
+      log(
+        'GlobalAudioPlayerManager: Audio is still preparing for playerId: $playerId',
+      );
       return;
     }
 
@@ -844,7 +949,11 @@ class GlobalAudioPlayerManager {
       audioInfo.position.value = position;
 
       // Notificar callbacks
-      _safeExecuteParameterCallbacks(playerId, _onPositionChangedCallbacks[playerId], position);
+      _safeExecuteParameterCallbacks(
+        playerId,
+        _onPositionChangedCallbacks[playerId],
+        position,
+      );
     } catch (e) {
       log(
         'GlobalAudioPlayerManager: Error seeking for playerId: $playerId - $e',
@@ -872,7 +981,11 @@ class GlobalAudioPlayerManager {
       _addCallbackWithLimit(_onStopCallbacks, playerId, onStop);
     }
     if (onPositionChanged != null) {
-      _addCallbackWithLimit(_onPositionChangedCallbacks, playerId, onPositionChanged);
+      _addCallbackWithLimit(
+        _onPositionChangedCallbacks,
+        playerId,
+        onPositionChanged,
+      );
     }
     if (onWaveformData != null) {
       _addCallbackWithLimit(_onWaveformDataCallbacks, playerId, onWaveformData);
@@ -883,11 +996,11 @@ class GlobalAudioPlayerManager {
         onWaveformData(audioInfo!.waveformData.value!);
       }
     }
-    
+
     // Log estadísticas de callbacks para debugging
     final stats = getCallbackStats(playerId);
     log('GlobalAudioPlayerManager: Callback stats for $playerId: $stats');
-    
+
     // Iniciar limpieza automática de callbacks huérfanos si es necesario
     _scheduleOrphanedCallbackCleanup();
   }
@@ -925,7 +1038,7 @@ class GlobalAudioPlayerManager {
     _onStopCallbacks.remove(playerId);
     _onPositionChangedCallbacks.remove(playerId);
     _onWaveformDataCallbacks.remove(playerId);
-    
+
     // Limpiar locks de callbacks si existen
     _callbackLocks.remove(playerId);
   }
@@ -943,23 +1056,23 @@ class GlobalAudioPlayerManager {
   void dispose() {
     log('GlobalAudioPlayerManager: Disposing all resources');
     stopAll();
-    
+
     // Cancelar timer de limpieza
     _cleanupTimer?.cancel();
     _cleanupTimer = null;
-    
+
     // Limpiar todos los locks
     _preparingAudios.clear();
     _operationLocks.clear();
     _callbackLocks.clear();
-    
+
     // Limpiar todos los callbacks
     _onPlayCallbacks.clear();
     _onPauseCallbacks.clear();
     _onStopCallbacks.clear();
     _onPositionChangedCallbacks.clear();
     _onWaveformDataCallbacks.clear();
-    
+
     _activeAudiosController.close();
   }
 
@@ -986,5 +1099,23 @@ class GlobalAudioPlayerManager {
     // Solo limpiar callbacks, no detener el audio
     // El audio se mantiene activo para el overlay
     clearCallbacks(playerId);
+  }
+
+  /// Limpia archivos temporales descargados
+  Future<void> cleanupTempFiles() async {
+    try {
+      await MediaUtils.cleanupTempFiles();
+      log('GlobalAudioPlayerManager: Temporary files cleaned up successfully');
+    } catch (e) {
+      log('GlobalAudioPlayerManager: Error cleaning up temp files: $e');
+    }
+  }
+
+  /// Programa limpieza automática de archivos temporales
+  void scheduleTempFileCleanup() {
+    // Limpiar archivos temporales cada hora
+    Timer.periodic(const Duration(hours: 1), (timer) {
+      cleanupTempFiles();
+    });
   }
 }

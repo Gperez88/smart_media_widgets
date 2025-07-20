@@ -519,50 +519,16 @@ class _AudioPlayerWidgetState extends State<SmartAudioPlayerWidget>
   Future<String> _resolveAudioPath() async {
     debugPrint('AudioPlayerWidget: Resolving path for: ${widget.audioSource}');
 
-    if (MediaUtils.isRemoteSource(widget.audioSource)) {
-      debugPrint('AudioPlayerWidget: Detected remote source');
-
-      // Check if already cached
-      final cachedPath = await CacheManager.getCachedAudioPath(
+    // Use the new MediaUtils.getAudioSourcePath() function for all sources
+    try {
+      final resolvedPath = await MediaUtils.getAudioSourcePath(
         widget.audioSource,
       );
-
-      if (cachedPath != null) {
-        debugPrint('AudioPlayerWidget: Found cached path: $cachedPath');
-
-        // Validate that the cached file still exists
-        if (File(cachedPath).existsSync()) {
-          debugPrint('AudioPlayerWidget: Using cached path: $cachedPath');
-          return cachedPath;
-        } else {
-          debugPrint(
-            'AudioPlayerWidget: Cached file no longer exists, falling back to remote URL',
-          );
-          // If cached file was deleted, fall back to remote URL
-          return widget.audioSource;
-        }
-      } else {
-        debugPrint(
-          'AudioPlayerWidget: Using remote URL directly: ${widget.audioSource}',
-        );
-        // If not cached, use progressive streaming
-        // The audio_waveforms package supports URLs directly
-        return widget.audioSource;
-      }
-    } else if (MediaUtils.isLocalSource(widget.audioSource)) {
-      debugPrint('AudioPlayerWidget: Detected local source');
-      final path = MediaUtils.normalizeLocalPath(widget.audioSource);
-      debugPrint('AudioPlayerWidget: Normalized local path: $path');
-
-      if (!File(path).existsSync()) {
-        throw Exception('Local audio file not found: $path');
-      }
-      return path;
-    } else {
-      debugPrint(
-        'AudioPlayerWidget: Invalid source detected: ${widget.audioSource}',
-      );
-      throw Exception('Invalid audio source: ${widget.audioSource}');
+      debugPrint('AudioPlayerWidget: Resolved path: $resolvedPath');
+      return resolvedPath;
+    } catch (e) {
+      debugPrint('AudioPlayerWidget: Error resolving path: $e');
+      throw Exception('Failed to resolve audio path: $e');
     }
   }
 
