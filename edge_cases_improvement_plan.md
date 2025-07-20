@@ -78,21 +78,32 @@ Análisis y mejora de edge cases en `GlobalAudioPlayerManager` y `CacheManager` 
 - Reemplazado timeout hardcodeado de 10s con cálculo inteligente basado en tamaño de archivo
 - **Commit**: `cee2b75` - feat(audio): implement adaptive network configuration and robust timeout handling
 
-## Fase 4: CacheManager - Concurrencia en Descargas
+## Fase 4: CacheManager - Concurrencia en Descargas ✅ COMPLETADA
 
 ### 4.1 Problemas Identificados
 - **Límites de concurrencia insuficientes**: Solo 3 audio y 2 video pueden ser restrictivos
 - **Race condition en contadores**: Operaciones no atómicas en contadores
 - **Descargas duplicadas**: Múltiples llamadas pueden iniciar descargas paralelas
 
-### 4.2 Soluciones Propuestas
-- [ ] Implementar contadores atómicos para downloads concurrentes
-- [ ] Agregar mapa de descargas en progreso para evitar duplicados
-- [ ] Configurar límites de concurrencia dinámicos basados en dispositivo
-- [ ] Implementar queue de prioridades para descargas
+### 4.2 Soluciones Implementadas
+- [x] Implementar contadores atómicos para downloads concurrentes
+- [x] Agregar mapa de descargas en progreso para evitar duplicados
+- [x] Configurar límites de concurrencia dinámicos basados en dispositivo
+- [x] Implementar queue de prioridades para descargas
 
-### 4.3 Archivos a Modificar
+### 4.3 Archivos Modificados
 - `lib/src/utils/cache_manager.dart`
+
+### 4.4 Cambios Implementados
+- Creada clase `DownloadConcurrencyManager` para gestión thread-safe de descargas concurrentes
+- Implementados contadores atómicos con mapas de progreso para evitar duplicados
+- Agregado sistema de queue con prioridades (low, normal, high, urgent)
+- Implementado procesamiento de descargas con ordenamiento por prioridad y FIFO para igual prioridad
+- Configuración dinámica de límites de concurrencia con método `configureLimits()`
+- Agregado soporte de prioridades en API pública: `cacheAudio()` y `cacheVideo()` con parámetro `DownloadPriority`
+- Removidas variables globales obsoletas de concurrencia
+- Agregadas estadísticas de monitoreo y logs detallados para debugging
+- **Commit**: Pendiente
 
 ## Fase 5: CacheManager - Gestión de Espacio en Disco
 

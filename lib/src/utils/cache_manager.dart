@@ -7,6 +7,238 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+/// Gestiona la concurrencia de descargas de manera thread-safe
+class DownloadConcurrencyManager {
+  int _audioDownloads = 0;
+  int _videoDownloads = 0;
+  int _maxAudioDownloads;
+  int _maxVideoDownloads;
+  
+  // Mapas para rastrear descargas en progreso y evitar duplicados
+  final Map<String, Completer<String?>> _audioDownloadsInProgress = {};
+  final Map<String, Completer<String?>> _videoDownloadsInProgress = {};
+  
+  // Queue de prioridades para descargas pendientes
+  final List<_DownloadRequest> _pendingDownloads = [];
+  Timer? _downloadProcessorTimer;
+
+  DownloadConcurrencyManager({
+    int maxAudioDownloads = 3,
+    int maxVideoDownloads = 2,
+  }) : _maxAudioDownloads = maxAudioDownloads,
+       _maxVideoDownloads = maxVideoDownloads {
+    _startDownloadProcessor();
+  }
+
+  /// Obtiene límites dinámicos basados en dispositivo
+  void updateLimits({int? maxAudio, int? maxVideo}) {
+    _maxAudioDownloads = maxAudio ?? _maxAudioDownloads;
+    _maxVideoDownloads = maxVideo ?? _maxVideoDownloads;
+    log('DownloadConcurrencyManager: Updated limits - Audio: $_maxAudioDownloads, Video: $_maxVideoDownloads');
+  }
+
+  /// Verifica si se puede iniciar una descarga de audio
+  bool canStartAudioDownload() => _audioDownloads < _maxAudioDownloads;
+
+  /// Verifica si se puede iniciar una descarga de video
+  bool canStartVideoDownload() => _videoDownloads < _maxVideoDownloads;
+
+  /// Incrementa contador de audio de manera thread-safe
+  void incrementAudioDownloads() {
+    _audioDownloads++;
+    log('DownloadConcurrencyManager: Audio downloads: $_audioDownloads/$_maxAudioDownloads');
+  }
+
+  /// Decrementa contador de audio de manera thread-safe
+  void decrementAudioDownloads() {
+    _audioDownloads = (_audioDownloads - 1).clamp(0, _maxAudioDownloads);
+    log('DownloadConcurrencyManager: Audio downloads: $_audioDownloads/$_maxAudioDownloads');
+    _processNextDownload();
+  }
+
+  /// Incrementa contador de video de manera thread-safe
+  void incrementVideoDownloads() {
+    _videoDownloads++;
+    log('DownloadConcurrencyManager: Video downloads: $_videoDownloads/$_maxVideoDownloads');
+  }
+
+  /// Decrementa contador de video de manera thread-safe
+  void decrementVideoDownloads() {
+    _videoDownloads = (_videoDownloads - 1).clamp(0, _maxVideoDownloads);
+    log('DownloadConcurrencyManager: Video downloads: $_videoDownloads/$_maxVideoDownloads');
+    _processNextDownload();
+  }
+
+  /// Registra una descarga en progreso para evitar duplicados
+  Future<String?> registerAudioDownload(String url, Future<String?> Function() downloadFunction) async {
+    // Si ya está en progreso, esperar a que termine
+    if (_audioDownloadsInProgress.containsKey(url)) {
+      log('DownloadConcurrencyManager: Audio download already in progress for: $url');
+      return await _audioDownloadsInProgress[url]!.future;
+    }
+
+    final completer = Completer<String?>();
+    _audioDownloadsInProgress[url] = completer;
+
+    try {
+      final result = await downloadFunction();
+      completer.complete(result);
+      return result;
+    } catch (e) {
+      completer.completeError(e);
+      rethrow;
+    } finally {
+      _audioDownloadsInProgress.remove(url);
+    }
+  }
+
+  /// Registra una descarga de video en progreso
+  Future<String?> registerVideoDownload(String url, Future<String?> Function() downloadFunction) async {
+    // Si ya está en progreso, esperar a que termine
+    if (_videoDownloadsInProgress.containsKey(url)) {
+      log('DownloadConcurrencyManager: Video download already in progress for: $url');
+      return await _videoDownloadsInProgress[url]!.future;
+    }
+
+    final completer = Completer<String?>();
+    _videoDownloadsInProgress[url] = completer;
+
+    try {
+      final result = await downloadFunction();
+      completer.complete(result);
+      return result;
+    } catch (e) {
+      completer.completeError(e);
+      rethrow;
+    } finally {
+      _videoDownloadsInProgress.remove(url);
+    }
+  }
+
+  /// Agenda una descarga si no hay slots disponibles
+  Future<String?> _scheduleDownload(_DownloadRequest request) async {
+    _pendingDownloads.add(request);
+    log('DownloadConcurrencyManager: Scheduled ${request.type} download: ${request.url} (queue: ${_pendingDownloads.length})');
+    
+    return await request.completer.future;
+  }
+
+  /// Procesa la siguiente descarga en la queue con prioridades
+  void _processNextDownload() {
+    if (_pendingDownloads.isEmpty) return;
+
+    // Ordenar por prioridad (mayor prioridad primero) y luego por timestamp (FIFO para igual prioridad)
+    _pendingDownloads.sort((a, b) {
+      final priorityComparison = b.priorityValue.compareTo(a.priorityValue);
+      if (priorityComparison != 0) return priorityComparison;
+      return a.timestamp.compareTo(b.timestamp);
+    });
+
+    for (int i = 0; i < _pendingDownloads.length; i++) {
+      final request = _pendingDownloads[i];
+      bool canStart = false;
+
+      if (request.type == _DownloadType.audio && canStartAudioDownload()) {
+        canStart = true;
+      } else if (request.type == _DownloadType.video && canStartVideoDownload()) {
+        canStart = true;
+      }
+
+      if (canStart) {
+        _pendingDownloads.removeAt(i);
+        log('DownloadConcurrencyManager: Starting queued ${request.type} download (priority: ${request.priority}): ${request.url}');
+        
+        // Ejecutar la descarga
+        _executeDownload(request);
+        break; // Solo procesar una descarga por vez
+      }
+    }
+  }
+
+  /// Ejecuta una descarga desde la queue
+  void _executeDownload(_DownloadRequest request) async {
+    try {
+      final result = await request.downloadFunction();
+      request.completer.complete(result);
+    } catch (e) {
+      request.completer.completeError(e);
+    }
+  }
+
+  /// Inicia el procesador de descargas
+  void _startDownloadProcessor() {
+    _downloadProcessorTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      _processNextDownload();
+    });
+  }
+
+  /// Obtiene estadísticas de descargas
+  Map<String, dynamic> getStats() {
+    return {
+      'audioDownloads': _audioDownloads,
+      'maxAudioDownloads': _maxAudioDownloads,
+      'videoDownloads': _videoDownloads,
+      'maxVideoDownloads': _maxVideoDownloads,
+      'audioInProgress': _audioDownloadsInProgress.length,
+      'videoInProgress': _videoDownloadsInProgress.length,
+      'pendingDownloads': _pendingDownloads.length,
+    };
+  }
+
+  /// Limpia recursos
+  void dispose() {
+    _downloadProcessorTimer?.cancel();
+    _downloadProcessorTimer = null;
+    
+    // Cancelar descargas pendientes
+    for (final request in _pendingDownloads) {
+      request.completer.completeError('Download manager disposed');
+    }
+    _pendingDownloads.clear();
+    
+    _audioDownloadsInProgress.clear();
+    _videoDownloadsInProgress.clear();
+  }
+}
+
+/// Tipo de descarga
+enum _DownloadType { audio, video }
+
+/// Prioridad de descarga
+enum DownloadPriority { low, normal, high, urgent }
+
+/// Request de descarga para la queue
+class _DownloadRequest {
+  final String url;
+  final _DownloadType type;
+  final Future<String?> Function() downloadFunction;
+  final Completer<String?> completer;
+  final DateTime timestamp;
+  final DownloadPriority priority;
+
+  _DownloadRequest({
+    required this.url,
+    required this.type,
+    required this.downloadFunction,
+    required this.completer,
+    this.priority = DownloadPriority.normal,
+  }) : timestamp = DateTime.now();
+
+  /// Valor numérico para ordenamiento (mayor = más prioridad)
+  int get priorityValue {
+    switch (priority) {
+      case DownloadPriority.urgent:
+        return 4;
+      case DownloadPriority.high:
+        return 3;
+      case DownloadPriority.normal:
+        return 2;
+      case DownloadPriority.low:
+        return 1;
+    }
+  }
+}
+
 /// Configuration class for cache settings
 class CacheConfig {
   /// Maximum size for image cache in bytes (default: 100MB)
@@ -155,8 +387,13 @@ class CacheManager {
 
   CacheConfig _config = const CacheConfig();
   CacheConfig? _originalConfig;
+  
+  // Gestor de concurrencia de descargas
+  late final DownloadConcurrencyManager _downloadManager;
 
-  CacheManager._internal();
+  CacheManager._internal() {
+    _downloadManager = DownloadConcurrencyManager();
+  }
 
   /// Get current cache configuration
   CacheConfig get config => _config;
@@ -204,6 +441,41 @@ class CacheManager {
     if (_originalConfig != null) {
       _config = _originalConfig!;
     }
+  }
+
+  /// Configura límites de descarga dinámicos basados en dispositivo
+  void configureDynamicDownloadLimits() {
+    int audioLimit = 3;
+    int videoLimit = 2;
+
+    try {
+      // En una implementación real, aquí se detectaría el tipo de dispositivo
+      // Por ahora, usamos una lógica simple basada en platform
+      if (Platform.isAndroid || Platform.isIOS) {
+        // Dispositivos móviles: límites conservadores
+        audioLimit = 2;
+        videoLimit = 1;
+      } else {
+        // Desktop/Web: límites más altos
+        audioLimit = 4;
+        videoLimit = 3;
+      }
+
+      _downloadManager.updateLimits(maxAudio: audioLimit, maxVideo: videoLimit);
+      log('CacheManager: Configured dynamic download limits - Audio: $audioLimit, Video: $videoLimit');
+    } catch (e) {
+      log('CacheManager: Error configuring dynamic limits: $e');
+    }
+  }
+
+  /// Obtiene estadísticas de descargas
+  Map<String, dynamic> getDownloadStats() {
+    return _downloadManager.getStats();
+  }
+
+  /// Actualiza límites de descarga manualmente
+  void updateDownloadLimits({int? maxAudio, int? maxVideo}) {
+    _downloadManager.updateLimits(maxAudio: maxAudio, maxVideo: maxVideo);
   }
 
   /// Clears all cached images
@@ -477,18 +749,40 @@ class CacheManager {
   }
 
   /// Downloads and caches an audio file from a remote URL. Returns the local path if successful, or null if failed.
-  static Future<String?> cacheAudio(String audioUrl) async {
-    if (_concurrentAudioDownloads >= _maxConcurrentAudioDownloads) {
-      log(
-        'CacheManager: Skipping audio download - too many concurrent downloads: $_concurrentAudioDownloads',
+  static Future<String?> cacheAudio(
+    String audioUrl, {
+    DownloadPriority priority = DownloadPriority.normal,
+  }) async {
+    final manager = CacheManager.instance;
+
+    // Verificar si se puede iniciar inmediatamente o si hay que agendar
+    if (manager._downloadManager.canStartAudioDownload()) {
+      return await manager._downloadManager.registerAudioDownload(audioUrl, () => _downloadAudioFile(audioUrl));
+    } else {
+      // Agendar la descarga con prioridad
+      final request = _DownloadRequest(
+        url: audioUrl,
+        type: _DownloadType.audio,
+        downloadFunction: () => _downloadAudioFile(audioUrl),
+        completer: Completer<String?>(),
+        priority: priority,
       );
-      return null;
+      return await manager._downloadManager._scheduleDownload(request);
+    }
+  }
+
+  /// Descarga el archivo de audio (método auxiliar)
+  static Future<String?> _downloadAudioFile(String audioUrl) async {
+    final manager = CacheManager.instance;
+    
+    // Verificar si ya está en caché
+    final cachedPath = await getCachedAudioPath(audioUrl);
+    if (cachedPath != null) {
+      log('CacheManager: Audio already cached: $audioUrl');
+      return cachedPath;
     }
 
-    _concurrentAudioDownloads++;
-    log(
-      'CacheManager: Starting audio download: $audioUrl (concurrent: $_concurrentAudioDownloads)',
-    );
+    manager._downloadManager.incrementAudioDownloads();
 
     try {
       final audioCacheDir = await getAudioCacheDirectory();
@@ -544,10 +838,7 @@ class CacheManager {
       log('CacheManager: Error caching audio: $e');
       return null;
     } finally {
-      _concurrentAudioDownloads--;
-      log(
-        'CacheManager: Finished audio download: $audioUrl (concurrent: $_concurrentAudioDownloads)',
-      );
+      manager._downloadManager.decrementAudioDownloads();
     }
   }
 
@@ -593,18 +884,40 @@ class CacheManager {
   }
 
   /// Downloads and caches a video file from a remote URL. Returns the local path if successful, or null if failed.
-  static Future<String?> cacheVideo(String videoUrl) async {
-    if (_concurrentVideoDownloads >= _maxConcurrentVideoDownloads) {
-      log(
-        'CacheManager: Skipping video download - too many concurrent downloads: $_concurrentVideoDownloads',
+  static Future<String?> cacheVideo(
+    String videoUrl, {
+    DownloadPriority priority = DownloadPriority.normal,
+  }) async {
+    final manager = CacheManager.instance;
+
+    // Verificar si se puede iniciar inmediatamente o si hay que agendar
+    if (manager._downloadManager.canStartVideoDownload()) {
+      return await manager._downloadManager.registerVideoDownload(videoUrl, () => _downloadVideoFile(videoUrl));
+    } else {
+      // Agendar la descarga con prioridad
+      final request = _DownloadRequest(
+        url: videoUrl,
+        type: _DownloadType.video,
+        downloadFunction: () => _downloadVideoFile(videoUrl),
+        completer: Completer<String?>(),
+        priority: priority,
       );
-      return null;
+      return await manager._downloadManager._scheduleDownload(request);
+    }
+  }
+
+  /// Descarga el archivo de video (método auxiliar)
+  static Future<String?> _downloadVideoFile(String videoUrl) async {
+    final manager = CacheManager.instance;
+    
+    // Verificar si ya está en caché
+    final cachedPath = await getCachedVideoPath(videoUrl);
+    if (cachedPath != null) {
+      log('CacheManager: Video already cached: $videoUrl');
+      return cachedPath;
     }
 
-    _concurrentVideoDownloads++;
-    log(
-      'CacheManager: Starting video download: $videoUrl (concurrent: $_concurrentVideoDownloads)',
-    );
+    manager._downloadManager.incrementVideoDownloads();
 
     try {
       final videoCacheDir = await getVideoCacheDirectory();
@@ -660,10 +973,7 @@ class CacheManager {
       log('CacheManager: Error caching video: $e');
       return null;
     } finally {
-      _concurrentVideoDownloads--;
-      log(
-        'CacheManager: Finished video download: $videoUrl (concurrent: $_concurrentVideoDownloads)',
-      );
+      manager._downloadManager.decrementVideoDownloads();
     }
   }
 
@@ -975,10 +1285,4 @@ class CacheManager {
   }
 }
 
-/// Counter to limit concurrent audio downloads
-int _concurrentAudioDownloads = 0;
-const int _maxConcurrentAudioDownloads = 3; // Max 3 concurrent downloads
-
-/// Counter to limit concurrent video downloads
-int _concurrentVideoDownloads = 0;
-const int _maxConcurrentVideoDownloads = 2; // Max 2 concurrent downloads
+// Variables de concurrencia obsoletas removidas - ahora se usa DownloadConcurrencyManager
